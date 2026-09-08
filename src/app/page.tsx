@@ -65,7 +65,7 @@ export default async function Home() {
           26.5 CM — THE ONLY NUMBER THAT MATTERS
         </div>
 
-        <div className="pointer-events-none relative z-10 mx-auto flex min-h-0 max-w-[1600px] flex-col justify-center px-4 py-12 md:min-h-[92svh] md:px-8 md:py-24">
+        <div className="pointer-events-none relative z-10 mx-auto flex min-h-[50svh] w-full max-w-[1600px] flex-1 flex-col justify-center px-4 pt-4 pb-24 md:min-h-[92svh] md:px-8 md:pt-24">
           <div className="max-w-3xl">
             <p className="flex items-center gap-2 font-mono text-[10px] tracking-[0.3em] text-bone/80">
               <span className="inline-block h-2 w-2 bg-signal" />
