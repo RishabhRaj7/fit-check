@@ -20,6 +20,7 @@ const archivo = Archivo({
 });
 
 export const metadata: Metadata = {
+  icons: [{ url: "/logo.svg", type: "image/svg+xml" }],
   title: {
     default: "FIT CHECK — Know Your Size In Every Brand",
     template: "%s — FIT CHECK",
