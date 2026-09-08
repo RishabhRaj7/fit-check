@@ -14,7 +14,7 @@ service cloud.firestore {
 
     function isAdmin() {
       return request.auth != null
-        && request.auth.token.email == "rishabhraj.txt@gmail.com";
+        && request.auth.uid == "UBcMuGNyIMVLOJ0f9fHY2qrc75v1";
     }
 
     match /users/{uid} {
