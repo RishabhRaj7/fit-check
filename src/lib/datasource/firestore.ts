@@ -1,4 +1,15 @@
-import { getFs } from "@/lib/firebase/admin";
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  setDoc,
+  updateDoc,
+  where,
+} from "firebase/firestore";
+import { getFsWeb } from "@/lib/firebase/app";
 import { slugify } from "@/lib/format";
 import type {
   BrandInput,
@@ -19,6 +30,10 @@ import type {
  *   charts/{slug}__{category}__{gender}  { brandSlug, brandName, category, gender, needsData,
  *                                          updatedAt, updatedBy, rows: ChartRowRec[] }
  *   products/{autoId}                    { brandSlug, category, name, slug, imageUrl, priceInr }
+ *
+ * Reads use the public web-app config. Writes happen from an authenticated
+ * admin context (Google sign-in in /admin, or the authenticated seed script)
+ * and are enforced by firestore.rules.
  */
 const chartDocId = (slug: string, category: string, gender: string) =>
   `${slug}__${category}__${gender}`;
@@ -56,29 +71,28 @@ export const firestoreSource: DataSource = {
   name: "firestore",
 
   async listBrands(): Promise<BrandRec[]> {
-    const snap = await getFs().collection("brands").get();
+    const snap = await getDocs(collection(getFsWeb(), "brands"));
     return snap.docs
-      .map((doc) => toBrand(doc.id, doc.data()))
+      .map((d) => toBrand(d.id, d.data()))
       .sort((a, b) => b.priority - a.priority || a.name.localeCompare(b.name));
   },
 
   async getBrandBySlug(slug) {
-    const doc = await getFs().collection("brands").doc(slug).get();
-    return doc.exists ? toBrand(doc.id, doc.data() ?? {}) : null;
+    const d = await getDoc(doc(getFsWeb(), "brands", slug));
+    return d.exists() ? toBrand(d.id, d.data() ?? {}) : null;
   },
 
   async getChart(brandSlug, category, gender): Promise<ChartRec | null> {
-    const doc = await getFs()
-      .collection("charts")
-      .doc(chartDocId(brandSlug, category, gender))
-      .get();
-    return doc.exists ? toChart(doc.id, doc.data() ?? {}) : null;
+    const d = await getDoc(
+      doc(getFsWeb(), "charts", chartDocId(brandSlug, category, gender))
+    );
+    return d.exists() ? toChart(d.id, d.data() ?? {}) : null;
   },
 
   async listCharts(): Promise<ChartRec[]> {
-    const snap = await getFs().collection("charts").get();
+    const snap = await getDocs(collection(getFsWeb(), "charts"));
     return snap.docs
-      .map((doc) => toChart(doc.id, doc.data()))
+      .map((d) => toChart(d.id, d.data()))
       .sort(
         (a, b) =>
           a.brandName.localeCompare(b.brandName) ||
@@ -88,50 +102,50 @@ export const firestoreSource: DataSource = {
   },
 
   async getChartAvailability(category) {
-    const snap = await getFs()
-      .collection("charts")
-      .where("category", "==", category)
-      .get();
+    const snap = await getDocs(
+      query(collection(getFsWeb(), "charts"), where("category", "==", category))
+    );
     const map: Record<string, string[]> = {};
-    for (const doc of snap.docs) {
-      const c = toChart(doc.id, doc.data());
+    for (const d of snap.docs) {
+      const c = toChart(d.id, d.data());
       if (c.rows.length > 0) (map[c.brandSlug] ??= []).push(c.gender);
     }
     return map;
   },
 
   async listProducts(brandSlug?, category?): Promise<ProductRec[]> {
-    let ref: FirebaseFirestore.Query = getFs().collection("products");
-    if (brandSlug !== undefined) ref = ref.where("brandSlug", "==", brandSlug);
-    if (category) ref = ref.where("category", "==", category);
-    const snap = await ref.get();
+    const fs = getFsWeb();
+    let ref: ReturnType<typeof collection> | ReturnType<typeof query> =
+      collection(fs, "products");
+    if (brandSlug !== undefined) ref = query(ref, where("brandSlug", "==", brandSlug));
+    if (category) ref = query(ref, where("category", "==", category));
+    const snap = await getDocs(ref);
     const brandNames = new Map<string, string>();
-    for (const doc of await getFs().collection("brands").get().then((s) => s.docs)) {
-      brandNames.set(doc.id, (doc.data().name as string) ?? doc.id);
-    }
-    return snap.docs.map((doc) => {
-      const d = doc.data();
+    const bSnap = await getDocs(collection(fs, "brands"));
+    bSnap.docs.forEach((d) => brandNames.set(d.id, (d.data().name as string) ?? d.id));
+    return snap.docs.map((d) => {
+      const data = d.data() as Record<string, unknown>;
       return {
-        id: doc.id,
-        brandSlug: (d.brandSlug as string) ?? "",
-        brandName: brandNames.get(d.brandSlug as string) ?? "",
-        category: (d.category as string) ?? "",
-        name: (d.name as string) ?? "",
-        slug: (d.slug as string) ?? "",
-        imageUrl: (d.imageUrl as string) ?? null,
-        priceInr: (d.priceInr as number) ?? null,
+        id: d.id,
+        brandSlug: (data.brandSlug as string) ?? "",
+        brandName: brandNames.get(data.brandSlug as string) ?? "",
+        category: (data.category as string) ?? "",
+        name: (data.name as string) ?? "",
+        slug: (data.slug as string) ?? "",
+        imageUrl: (data.imageUrl as string) ?? null,
+        priceInr: (data.priceInr as number) ?? null,
       };
     });
   },
 
   async getStats(): Promise<StatsRec> {
-    const fs = getFs();
+    const fs = getFsWeb();
     const [b, c] = await Promise.all([
-      fs.collection("brands").get(),
-      fs.collection("charts").get(),
+      getDocs(collection(fs, "brands")),
+      getDocs(collection(fs, "charts")),
     ]);
-    const rows = c.docs.reduce((n, doc) => {
-      const r = doc.data().rows;
+    const rows = c.docs.reduce((n, d) => {
+      const r = d.data().rows;
       return n + (Array.isArray(r) ? r.length : 0);
     }, 0);
     return { brands: b.size, charts: c.size, rows };
@@ -141,9 +155,9 @@ export const firestoreSource: DataSource = {
     const name = input.name.trim();
     if (!name) return { error: "name required" };
     const slug = slugify(name);
-    const ref = getFs().collection("brands").doc(slug);
-    const existing = await ref.get();
-    if (existing.exists) return { error: `Slug "${slug}" already exists` };
+    const ref = doc(getFsWeb(), "brands", slug);
+    const existing = await getDoc(ref);
+    if (existing.exists()) return { error: `Slug "${slug}" already exists` };
     const brand: BrandRec = {
       id: slug,
       slug,
@@ -153,72 +167,60 @@ export const firestoreSource: DataSource = {
       priority: input.priority ?? 0,
       needsData: false,
     };
-    await ref.set({
-      ...brand,
-      createdAt: new Date().toISOString(),
-    });
+    await setDoc(ref, { ...brand, createdAt: new Date().toISOString() });
     return { brand };
   },
 
   async updateBrand(slug, patch: BrandPatch) {
-    const ref = getFs().collection("brands").doc(slug);
-    const doc = await ref.get();
-    if (!doc.exists) return null;
-    await ref.update({ ...patch });
-    const after = await ref.get();
+    const ref = doc(getFsWeb(), "brands", slug);
+    const d = await getDoc(ref);
+    if (!d.exists()) return null;
+    await updateDoc(ref, { ...patch });
+    const after = await getDoc(ref);
     return toBrand(after.id, after.data() ?? {});
   },
 
   async deleteBrand(slug) {
-    const fs = getFs();
-    const batchDeletes: Promise<unknown>[] = [];
-    batchDeletes.push(fs.collection("brands").doc(slug).delete());
-    const charts = await fs
-      .collection("charts")
-      .where("brandSlug", "==", slug)
-      .get();
-    charts.docs.forEach((doc) => batchDeletes.push(doc.ref.delete()));
-    const prods = await fs
-      .collection("products")
-      .where("brandSlug", "==", slug)
-      .get();
-    prods.docs.forEach((doc) => batchDeletes.push(doc.ref.delete()));
-    await Promise.all(batchDeletes);
+    const fs = getFsWeb();
+    await deleteDoc(doc(fs, "brands", slug));
+    const charts = await getDocs(query(collection(fs, "charts"), where("brandSlug", "==", slug)));
+    const prods = await getDocs(query(collection(fs, "products"), where("brandSlug", "==", slug)));
+    await Promise.all([
+      ...charts.docs.map((d) => deleteDoc(d.ref)),
+      ...prods.docs.map((d) => deleteDoc(d.ref)),
+    ]);
   },
 
   async upsertChart(input: ChartInput) {
-    const fs = getFs();
-    const brandDoc = await fs.collection("brands").doc(input.brandSlug).get();
-    if (!brandDoc.exists) throw new Error("Unknown brand slug");
+    const fs = getFsWeb();
+    const brandDoc = await getDoc(doc(fs, "brands", input.brandSlug));
+    if (!brandDoc.exists()) throw new Error("Unknown brand slug");
     const brandName = (brandDoc.data()?.name as string) ?? input.brandSlug;
     const id = chartDocId(input.brandSlug, input.category, input.gender);
-    await fs
-      .collection("charts")
-      .doc(id)
-      .set({
-        brandSlug: input.brandSlug,
-        brandName,
-        category: input.category,
-        gender: input.gender,
-        needsData: input.needsData ?? false,
-        updatedBy: input.updatedBy ?? "admin",
-        updatedAt: new Date().toISOString(),
-        rows: input.rows,
-      });
+    await setDoc(doc(fs, "charts", id), {
+      brandSlug: input.brandSlug,
+      brandName,
+      category: input.category,
+      gender: input.gender,
+      needsData: input.needsData ?? false,
+      updatedBy: input.updatedBy ?? "admin",
+      updatedAt: new Date().toISOString(),
+      rows: input.rows,
+    });
     return { chartId: id, rowCount: input.rows.length };
   },
 
   async createProduct(input: ProductInput): Promise<ProductRec> {
-    const ref = await getFs()
-      .collection("products")
-      .add({
+    const ref = await import("firebase/firestore").then((m) =>
+      m.addDoc(collection(getFsWeb(), "products"), {
         brandSlug: input.brandSlug,
         category: input.category,
         name: input.name,
         slug: slugify(input.name),
         imageUrl: input.imageUrl ?? null,
         priceInr: input.priceInr ?? null,
-      });
+      })
+    );
     return {
       id: ref.id,
       brandSlug: input.brandSlug,
@@ -231,6 +233,6 @@ export const firestoreSource: DataSource = {
   },
 
   async deleteProduct(id) {
-    await getFs().collection("products").doc(id).delete();
+    await deleteDoc(doc(getFsWeb(), "products", id));
   },
 };

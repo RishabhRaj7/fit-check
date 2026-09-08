@@ -1,12 +1,39 @@
 rules_version = '2';
 
-// Fit Check talks to Firestore exclusively through the Firebase Admin SDK
-// (server-side), which bypasses security rules. The browser never touches
-// Firestore directly, so the correct default is to deny all client access.
+// ── Fit Check security rules ────────────────────────────────────────────────
+// • brands / charts / products: public READ (the app reads everywhere with
+//   the public web-app config). WRITE only for the admin — Google sign-in in
+//   /admin, or the seed script's email/password account.
+// • users/{uid}: private per-user size profiles. READ/WRITE only for the
+//   authenticated owner (Firebase Google sign-in on /profile).
+//
+// ⚠️  REPLACE the admin email below with YOUR Google account email (same as
+//     ADMIN_EMAIL), then: firebase deploy --only firestore
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if false;
+
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email == "rishabhraj.txt@gmail.com";
+    }
+
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    match /brands/{brandId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /charts/{chartId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /products/{productId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
     }
   }
 }

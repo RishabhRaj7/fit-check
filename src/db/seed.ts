@@ -2,8 +2,12 @@ import "dotenv/config";
 import { BRANDS, PRODUCTS, slugifyProduct } from "./seedData";
 
 /**
- * Seed dispatcher — writes to Firestore when the FIREBASE_* service account
- * env vars are present (production datasource), otherwise to local Postgres.
+ * Seed dispatcher.
+ *  - With FIREBASE_* web-app config present: seeds Firestore. Because public
+ *    config can only READ, the script signs in with email/password first
+ *    (ADMIN_EMAIL + ADMIN_PASSWORD env vars — the same email hardcoded in
+ *    firestore.rules). The account is created on first run if needed.
+ *  - Otherwise: seeds local Postgres (offline fallback).
  */
 
 async function seedPostgres() {
@@ -75,23 +79,62 @@ async function seedPostgres() {
 }
 
 async function seedFirestore() {
-  const { getFs } = await import("../lib/firebase/admin");
-  const fs = getFs();
+  const cfg = {
+    apiKey: process.env.FIREBASE_API_KEY ?? "",
+    authDomain: process.env.FIREBASE_AUTH_DOMAIN ?? "",
+    projectId: process.env.FIREBASE_PROJECT_ID ?? "",
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET ?? "",
+    messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID ?? "",
+    appId: process.env.FIREBASE_APP_ID ?? "",
+  };
+  if (!cfg.apiKey || !cfg.projectId || !cfg.appId) {
+    throw new Error("FIREBASE_* web config incomplete");
+  }
+  const email = process.env.ADMIN_EMAIL ?? "";
+  const password = process.env.ADMIN_PASSWORD ?? "";
+  if (!email || !password) {
+    throw new Error(
+      "ADMIN_EMAIL and ADMIN_PASSWORD are required to seed Firestore " +
+        "(same email as hardcoded in firestore.rules)"
+    );
+  }
+
+  const { initializeApp } = await import("firebase/app");
+  const { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } =
+    await import("firebase/auth");
+  const {
+    getFirestore,
+    collection,
+    doc,
+    getDocs,
+    setDoc,
+    deleteDoc,
+    addDoc,
+  } = await import("firebase/firestore");
+
+  const app = initializeApp(cfg);
+  const auth = getAuth(app);
+  const fs = getFirestore(app);
+
+  console.log(`Signing in as ${email}…`);
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+  } catch {
+    console.log("Account not found — creating it…");
+    await createUserWithEmailAndPassword(auth, email, password);
+  }
 
   console.log("Seeding Firestore…");
-  // Clear existing collections
   for (const col of ["brands", "charts", "products"]) {
-    const snap = await fs.collection(col).get();
-    const batch = fs.batch();
-    snap.docs.forEach((doc) => batch.delete(doc.ref));
-    if (!snap.empty) await batch.commit();
+    const snap = await getDocs(collection(fs, col));
+    await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)));
   }
 
   let chartCount = 0;
   let rowCount = 0;
 
   for (const b of BRANDS) {
-    await fs.collection("brands").doc(b.slug).set({
+    await setDoc(doc(fs, "brands", b.slug), {
       name: b.name,
       slug: b.slug,
       categories: b.categories,
@@ -102,26 +145,23 @@ async function seedFirestore() {
     });
 
     for (const c of b.charts) {
-      await fs
-        .collection("charts")
-        .doc(`${b.slug}__${c.category}__${c.gender}`)
-        .set({
-          brandSlug: b.slug,
-          brandName: b.name,
-          category: c.category,
-          gender: c.gender,
-          needsData: false,
-          updatedBy: "seed",
-          updatedAt: new Date().toISOString(),
-          rows: c.rows,
-        });
+      await setDoc(doc(fs, "charts", `${b.slug}__${c.category}__${c.gender}`), {
+        brandSlug: b.slug,
+        brandName: b.name,
+        category: c.category,
+        gender: c.gender,
+        needsData: false,
+        updatedBy: "seed",
+        updatedAt: new Date().toISOString(),
+        rows: c.rows,
+      });
       chartCount++;
       rowCount += c.rows.length;
     }
   }
 
   for (const p of PRODUCTS) {
-    await fs.collection("products").add({
+    await addDoc(collection(fs, "products"), {
       brandSlug: p.brand,
       category: p.category,
       name: p.name,
@@ -134,14 +174,15 @@ async function seedFirestore() {
   console.log(
     `Seeded Firestore: ${BRANDS.length} brands, ${chartCount} charts, ${rowCount} rows, ${PRODUCTS.length} products.`
   );
+  process.exit(0); // close auth listeners
 }
 
 async function main() {
-  const { hasFirebaseCreds } = await import("../lib/firebase/admin");
-  if (hasFirebaseCreds()) {
+  const { hasFirebaseConfig } = await import("../lib/firebase/app");
+  if (hasFirebaseConfig()) {
     await seedFirestore();
   } else {
-    console.log("No FIREBASE_* creds found — falling back to Postgres.");
+    console.log("No FIREBASE_* config found — falling back to Postgres.");
     await seedPostgres();
   }
 }

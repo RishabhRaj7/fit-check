@@ -3,6 +3,7 @@
   "/admin/page": "app/admin/page.js",
   "/api/chart/route": "app/api/chart/route.js",
   "/api/convert/route": "app/api/convert/route.js",
+  "/api/firebase/config/route": "app/api/firebase/config/route.js",
   "/onboarding/page": "app/onboarding/page.js",
   "/page": "app/page.js",
   "/profile/page": "app/profile/page.js"

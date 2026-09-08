@@ -2,6 +2,18 @@
 
 import { useEffect, useState } from "react";
 import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  setDoc,
+  updateDoc,
+  where,
+} from "firebase/firestore";
+import {
   Check,
   Database,
   KeyRound,
@@ -14,8 +26,17 @@ import {
   TriangleAlert,
   Upload,
 } from "lucide-react";
+import type { User } from "firebase/auth";
 import { CATEGORY_ORDER, CATEGORIES, isCategory } from "@/lib/categories";
-import { cn } from "@/lib/format";
+import { cn, slugify } from "@/lib/format";
+import {
+  clientFs,
+  initClientFirebase,
+  isPermissionDenied,
+  onAuthChange,
+  signInGoogle,
+  signOutUser,
+} from "@/lib/firebase/clientAuth";
 
 export interface AdminBrand {
   /** Equals the brand slug for all backends. */
@@ -49,6 +70,8 @@ export interface AdminProduct {
   priceInr: number | null;
 }
 
+type AdminMode = "postgres" | "firestore";
+
 interface EditRow {
   anchorValue: string;
   eu: string;
@@ -57,6 +80,172 @@ interface EditRow {
   jpn: string;
   ind: string;
   label: string;
+}
+
+interface Ops {
+  createBrand(input: {
+    name: string;
+    categories: string[];
+    priority?: number;
+    logoUrl?: string;
+  }): Promise<{ brand?: AdminBrand; error?: string }>;
+  updateBrand(
+    slug: string,
+    patch: Partial<Pick<AdminBrand, "name" | "priority" | "needsData" | "logoUrl" | "categories">>
+  ): Promise<AdminBrand | null>;
+  deleteBrand(slug: string): Promise<void>;
+  saveChart(input: {
+    brandSlug: string;
+    category: string;
+    gender: string;
+    needsData: boolean;
+    rows: {
+      anchorValue: number;
+      eu: string | null;
+      uk: string | null;
+      us: string | null;
+      jpn: string | null;
+      ind: string | null;
+      label: string | null;
+    }[];
+  }): Promise<{ chartId: string; rowCount: number }>;
+  addProduct(input: {
+    brandSlug: string;
+    category: string;
+    name: string;
+    priceInr?: number;
+  }): Promise<AdminProduct>;
+  deleteProduct(id: string): Promise<void>;
+}
+
+function errMsg(e: unknown): string {
+  if (isPermissionDenied(e)) {
+    return "WRITE DENIED — this account is not the admin email in firestore.rules.";
+  }
+  return e instanceof Error ? e.message : "Operation failed";
+}
+
+/** Postgres fallback mode — mutations via the key-gated API. */
+function pgOps(
+  call: (path: string, init?: RequestInit) => Promise<any>
+): Ops {
+  return {
+    createBrand: (input) => call("/api/admin/brands", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+    updateBrand: (slug, patch) =>
+      call(`/api/admin/brands/${slug}`, {
+        method: "PATCH",
+        body: JSON.stringify(patch),
+      }).then((d) => d.brand ?? null),
+    deleteBrand: (slug) =>
+      call(`/api/admin/brands/${slug}`, { method: "DELETE" }).then(() => {}),
+    saveChart: (input) =>
+      call("/api/admin/charts", {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }).then((d) => {
+        if (d.error) throw new Error(d.error);
+        return { chartId: String(d.chartId), rowCount: d.rowCount };
+      }),
+    addProduct: (input) =>
+      call("/api/admin/products", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }).then((d) => d.product),
+    deleteProduct: (id) =>
+      call(`/api/admin/products/${id}`, { method: "DELETE" }).then(() => {}),
+  };
+}
+
+/** Firestore mode — authenticated writes straight from the browser. */
+function fsOps(): Ops {
+  const fs = () => clientFs()!;
+  return {
+    async createBrand(input) {
+      const name = input.name.trim();
+      if (!name) return { error: "name required" };
+      const slug = slugify(name);
+      const ref = doc(fs(), "brands", slug);
+      if ((await getDoc(ref)).exists()) {
+        return { error: `Slug "${slug}" already exists` };
+      }
+      const brand: AdminBrand = {
+        id: slug,
+        slug,
+        name,
+        logoUrl: input.logoUrl || `/brands/${slug}/logo.png`,
+        categories: input.categories,
+        priority: input.priority ?? 0,
+        needsData: false,
+      };
+      await setDoc(ref, { ...brand, createdAt: new Date().toISOString() });
+      return { brand };
+    },
+    async updateBrand(slug, patch) {
+      const ref = doc(fs(), "brands", slug);
+      if (!(await getDoc(ref)).exists()) return null;
+      await updateDoc(ref, { ...patch });
+      const after = await getDoc(ref);
+      const d = after.data() ?? {};
+      return {
+        id: slug,
+        slug,
+        name: (d.name as string) ?? slug,
+        logoUrl: (d.logoUrl as string) ?? null,
+        categories: (d.categories as string[]) ?? [],
+        priority: (d.priority as number) ?? 0,
+        needsData: (d.needsData as boolean) ?? false,
+      };
+    },
+    async deleteBrand(slug) {
+      await deleteDoc(doc(fs(), "brands", slug));
+      const [charts, prods] = await Promise.all([
+        getDocs(query(collection(fs(), "charts"), where("brandSlug", "==", slug))),
+        getDocs(query(collection(fs(), "products"), where("brandSlug", "==", slug))),
+      ]);
+      await Promise.all([
+        ...charts.docs.map((d) => deleteDoc(d.ref)),
+        ...prods.docs.map((d) => deleteDoc(d.ref)),
+      ]);
+    },
+    async saveChart(input) {
+      const id = `${input.brandSlug}__${input.category}__${input.gender}`;
+      await setDoc(doc(fs(), "charts", id), {
+        brandSlug: input.brandSlug,
+        brandName: "",
+        category: input.category,
+        gender: input.gender,
+        needsData: input.needsData,
+        updatedBy: "admin",
+        updatedAt: new Date().toISOString(),
+        rows: input.rows,
+      });
+      return { chartId: id, rowCount: input.rows.length };
+    },
+    async addProduct(input) {
+      const ref = await addDoc(collection(fs(), "products"), {
+        brandSlug: input.brandSlug,
+        category: input.category,
+        name: input.name,
+        slug: slugify(input.name),
+        imageUrl: null,
+        priceInr: input.priceInr ?? null,
+      });
+      return {
+        id: ref.id,
+        brandSlug: input.brandSlug,
+        brandName: "",
+        category: input.category,
+        name: input.name,
+        priceInr: input.priceInr ?? null,
+      };
+    },
+    async deleteProduct(id) {
+      await deleteDoc(doc(fs(), "products", id));
+    },
+  };
 }
 
 const emptyRow = (): EditRow => ({
@@ -93,20 +282,28 @@ function parseCsv(text: string): EditRow[] {
 const KEY_STORE = "sh_admin_key";
 
 export default function AdminApp({
+  mode,
   brands: initialBrands,
   charts: initialCharts,
   products: initialProducts,
 }: {
+  mode: AdminMode;
   brands: AdminBrand[];
   charts: AdminChart[];
   products: AdminProduct[];
 }) {
+  /* ---------------- auth / gate state ---------------- */
   const [key, setKey] = useState<string | null>(null);
   const [checking, setChecking] = useState(true);
   const [keyInput, setKeyInput] = useState("");
   const [gateError, setGateError] = useState("");
-  const [tab, setTab] = useState<"brands" | "charts" | "products">("brands");
 
+  const [fsReady, setFsReady] = useState<boolean | null>(
+    mode === "firestore" ? null : false
+  );
+  const [user, setUser] = useState<User | null>(null);
+
+  const [tab, setTab] = useState<"brands" | "charts" | "products">("brands");
   const [brands, setBrands] = useState(initialBrands);
   const [charts, setCharts] = useState(initialCharts);
   const [products, setProducts] = useState(initialProducts);
@@ -128,19 +325,31 @@ export default function AdminApp({
     return res.json();
   };
 
+  const ops: Ops = mode === "postgres" ? pgOps(call) : fsOps();
+
   useEffect(() => {
-    const stored = sessionStorage.getItem(KEY_STORE);
-    if (!stored) {
-      setChecking(false);
+    if (mode === "postgres") {
+      const stored = sessionStorage.getItem(KEY_STORE);
+      if (!stored) {
+        setChecking(false);
+        return;
+      }
+      fetch("/api/admin/ping", { headers: { "x-admin-key": stored } })
+        .then((r) => {
+          if (r.ok) setKey(stored);
+          else sessionStorage.removeItem(KEY_STORE);
+        })
+        .finally(() => setChecking(false));
       return;
     }
-    fetch("/api/admin/ping", { headers: { "x-admin-key": stored } })
-      .then((r) => {
-        if (r.ok) setKey(stored);
-        else sessionStorage.removeItem(KEY_STORE);
-      })
-      .finally(() => setChecking(false));
-  }, []);
+    let unsub: (() => void) | undefined;
+    initClientFirebase().then((ok) => {
+      setFsReady(ok);
+      if (ok) unsub = onAuthChange(setUser);
+      setChecking(false);
+    });
+    return () => unsub?.();
+  }, [mode]);
 
   const tryKey = async () => {
     setGateError("");
@@ -155,8 +364,10 @@ export default function AdminApp({
     }
   };
 
+  const authorized = mode === "postgres" ? !!key : !!user;
+
   /* ------------------------------------------------------------- gate */
-  if (checking) {
+  if (checking || (mode === "firestore" && fsReady === null)) {
     return (
       <div className="flex min-h-64 items-center justify-center">
         <Loader2 className="animate-spin text-frost" size={22} />
@@ -164,7 +375,47 @@ export default function AdminApp({
     );
   }
 
-  if (!key) {
+  if (!authorized) {
+    if (mode === "firestore") {
+      return (
+        <div className="mx-auto max-w-md border border-bone/12 bg-coal p-8">
+          <div className="flex items-center gap-3">
+            <KeyRound size={18} className="text-frost" strokeWidth={1.8} />
+            <span className="font-mono text-[10px] tracking-[0.24em] text-fog">
+              CONTROL DECK — FIRESTORE MODE
+            </span>
+          </div>
+          <h2 className="mt-4 font-display text-4xl tracking-tight text-bone">
+            ADMIN SIGN-IN<span className="text-frost">.</span>
+          </h2>
+          {fsReady === false ? (
+            <p className="mt-6 font-mono text-xs leading-relaxed text-frost">
+              Firebase web config not found. Set the six FIREBASE_* env vars,
+              restart, then reload.
+            </p>
+          ) : (
+            <>
+              <p className="mt-4 text-sm leading-relaxed text-fog">
+                Writes go straight to Firestore with your account. Only the
+                email hardcoded in{" "}
+                <span className="text-bone">firestore.rules</span> is allowed.
+              </p>
+              <button
+                onClick={() =>
+                  signInGoogle().catch((e) => setGateError(errMsg(e)))
+                }
+                className="mt-6 w-full bg-signal px-4 py-3 font-mono text-[11px] font-semibold tracking-[0.2em] text-bone uppercase transition-colors hover:bg-frost hover:text-ink"
+              >
+                Sign in with Google
+              </button>
+              {gateError && (
+                <p className="mt-2 font-mono text-xs text-frost">{gateError}</p>
+              )}
+            </>
+          )}
+        </div>
+      );
+    }
     return (
       <div className="mx-auto max-w-md border border-bone/12 bg-coal p-8">
         <div className="flex items-center gap-3">
@@ -189,7 +440,7 @@ export default function AdminApp({
         )}
         <button
           onClick={tryKey}
-          className="mt-4 w-full bg-signal px-4 py-3 font-mono text-[11px] font-semibold tracking-[0.2em] text-bone uppercase transition-colors hover:bg-frost hover:text-bone"
+          className="mt-4 w-full bg-signal px-4 py-3 font-mono text-[11px] font-semibold tracking-[0.2em] text-bone uppercase transition-colors hover:bg-frost hover:text-ink"
         >
           Enter deck
         </button>
@@ -238,27 +489,23 @@ export default function AdminApp({
                 onBlur={(e) => {
                   const v = Number(e.target.value);
                   if (v === b.priority) return;
-                  call(`/api/admin/brands/${b.slug}`, {
-                    method: "PATCH",
-                    body: JSON.stringify({ priority: v }),
-                  }).then((d) =>
-                    setBrands((prev) =>
-                      prev.map((x) => (x.id === b.id ? d.brand : x))
+                  ops
+                    .updateBrand(b.slug, { priority: v })
+                    .then((d) =>
+                      d && setBrands((prev) => prev.map((x) => (x.id === b.id ? d : x)))
                     )
-                  );
+                    .catch((e) => window.alert(errMsg(e)));
                 }}
                 className="w-16 border border-bone/15 bg-ink px-2 py-1.5 font-mono text-xs text-bone outline-none focus:border-frost"
               />
               <button
                 onClick={() =>
-                  call(`/api/admin/brands/${b.slug}`, {
-                    method: "PATCH",
-                    body: JSON.stringify({ needsData: !b.needsData }),
-                  }).then((d) =>
-                    setBrands((prev) =>
-                      prev.map((x) => (x.id === b.id ? d.brand : x))
+                  ops
+                    .updateBrand(b.slug, { needsData: !b.needsData })
+                    .then((d) =>
+                      d && setBrands((prev) => prev.map((x) => (x.id === b.id ? d : x)))
                     )
-                  )
+                    .catch((e) => window.alert(errMsg(e)))
                 }
                 className={cn(
                   "flex items-center gap-1.5 px-2 py-1.5 font-mono text-[9px] tracking-[0.16em]",
@@ -273,9 +520,10 @@ export default function AdminApp({
                 aria-label="Delete brand"
                 onClick={() => {
                   if (!window.confirm(`Delete ${b.name} and all its charts?`)) return;
-                  call(`/api/admin/brands/${b.slug}`, { method: "DELETE" }).then(() =>
-                    setBrands((prev) => prev.filter((x) => x.id !== b.id))
-                  );
+                  ops
+                    .deleteBrand(b.slug)
+                    .then(() => setBrands((prev) => prev.filter((x) => x.id !== b.id)))
+                    .catch((e) => window.alert(errMsg(e)));
                 }}
                 className="flex h-8 w-8 items-center justify-center border border-bone/15 text-fog transition-colors hover:border-frost hover:text-frost"
               >
@@ -287,7 +535,7 @@ export default function AdminApp({
       </div>
       <AddBrandForm
         onCreated={(brand) => setBrands((prev) => [...prev, brand])}
-        call={call}
+        ops={ops}
       />
     </div>
   );
@@ -319,28 +567,39 @@ export default function AdminApp({
             </button>
           ))}
         </div>
-        <button
-          onClick={() => {
-            sessionStorage.removeItem(KEY_STORE);
-            setKey(null);
-          }}
-          className="flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] text-fog uppercase transition-colors hover:text-bone"
-        >
-          <LogOut size={12} /> Exit deck
-        </button>
+        <div className="flex items-center gap-3">
+          {mode === "firestore" && user && (
+            <span className="font-mono text-[10px] tracking-[0.14em] text-fog">
+              {user.email}
+            </span>
+          )}
+          <button
+            onClick={() => {
+              if (mode === "postgres") {
+                sessionStorage.removeItem(KEY_STORE);
+                setKey(null);
+              } else {
+                void signOutUser().then(() => setUser(null));
+              }
+            }}
+            className="flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] text-fog uppercase transition-colors hover:text-bone"
+          >
+            <LogOut size={12} /> Exit deck
+          </button>
+        </div>
       </div>
 
       <div className="mt-8">
         {tab === "brands" && BrandsTab}
         {tab === "charts" && (
-          <ChartsTab brands={brands} charts={charts} setCharts={setCharts} call={call} />
+          <ChartsTab mode={mode} brands={brands} charts={charts} setCharts={setCharts} ops={ops} />
         )}
         {tab === "products" && (
           <ProductsTab
             brands={brands}
             products={products}
             setProducts={setProducts}
-            call={call}
+            ops={ops}
           />
         )}
       </div>
@@ -352,10 +611,10 @@ export default function AdminApp({
 
 function AddBrandForm({
   onCreated,
-  call,
+  ops,
 }: {
   onCreated: (b: AdminBrand) => void;
-  call: (path: string, init?: RequestInit) => Promise<any>;
+  ops: Ops;
 }) {
   const [name, setName] = useState("");
   const [cats, setCats] = useState<string[]>(["sneakers"]);
@@ -402,17 +661,16 @@ function AddBrandForm({
           onClick={() => {
             setBusy(true);
             setErr("");
-            call("/api/admin/brands", {
-              method: "POST",
-              body: JSON.stringify({ name: name.trim(), categories: cats }),
-            })
+            ops
+              .createBrand({ name: name.trim(), categories: cats })
               .then((d) => {
                 if (d.error) setErr(d.error);
-                else {
+                else if (d.brand) {
                   onCreated(d.brand);
                   setName("");
                 }
               })
+              .catch((e) => setErr(errMsg(e)))
               .finally(() => setBusy(false));
           }}
           className="flex items-center gap-2 bg-bone px-5 py-2.5 font-mono text-[10px] font-semibold tracking-[0.18em] text-ink uppercase transition-colors hover:bg-frost disabled:opacity-30"
@@ -428,15 +686,17 @@ function AddBrandForm({
 /* ============================================================== charts tab */
 
 function ChartsTab({
+  mode,
   brands,
   charts,
   setCharts,
-  call,
+  ops,
 }: {
+  mode: AdminMode;
   brands: AdminBrand[];
   charts: AdminChart[];
   setCharts: React.Dispatch<React.SetStateAction<AdminChart[]>>;
-  call: (path: string, init?: RequestInit) => Promise<any>;
+  ops: Ops;
 }) {
   const [brandSlug, setBrandSlug] = useState<string>(brands[0]?.slug ?? "");
   const [category, setCategory] = useState<string>("sneakers");
@@ -476,51 +736,62 @@ function ChartsTab({
 
   const save = async () => {
     setMsg("");
-    const payload = rows
-      .map((r) => ({
-        ...r,
-        anchorValue: r.anchorValue === "" ? NaN : Number(r.anchorValue),
-      }))
-      .filter((r) => Number.isFinite(Number(r.anchorValue)));
-    const d = await call("/api/admin/charts", {
-      method: "PUT",
-      body: JSON.stringify({
+    try {
+      const payload = rows
+        .map((r) => ({
+          anchorValue: r.anchorValue === "" ? NaN : Number(r.anchorValue),
+          eu: r.eu || null,
+          uk: r.uk || null,
+          us: r.us || null,
+          jpn: r.jpn || null,
+          ind: r.ind || null,
+          label: r.label || null,
+        }))
+        .filter((r) => Number.isFinite(Number(r.anchorValue)));
+      const d = await ops.saveChart({
         brandSlug,
         category,
         gender,
         needsData,
         rows: payload,
-      }),
-    });
-    setMsg(d.error ? d.error : `SAVED — ${d.rowCount} ROWS`);
-    if (!d.error && brand) {
-      setCharts((prev) => {
-        const idx = prev.findIndex(
-          (c) =>
-            c.brandSlug === brandSlug &&
-            c.category === category &&
-            c.gender === gender
-        );
-        if (idx >= 0) {
-          const next = [...prev];
-          next[idx] = { ...next[idx], rowCount: d.rowCount, needsData };
-          return next;
-        }
-        return [
-          ...prev,
-          {
-            id: String(d.chartId),
-            brandSlug,
-            brandName: brand.name,
-            category,
-            gender,
-            needsData,
-            rowCount: d.rowCount,
-            updatedAt: new Date().toISOString(),
-            updatedBy: "admin",
-          },
-        ];
       });
+      setMsg(`SAVED — ${d.rowCount} ROWS`);
+      if (brand) {
+        setCharts((prev) => {
+          const idx = prev.findIndex(
+            (c) =>
+              c.brandSlug === brandSlug &&
+              c.category === category &&
+              c.gender === gender
+          );
+          if (idx >= 0) {
+            const next = [...prev];
+            next[idx] = {
+              ...next[idx],
+              rowCount: d.rowCount,
+              needsData,
+              brandName: mode === "firestore" ? brand.name : next[idx].brandName,
+            };
+            return next;
+          }
+          return [
+            ...prev,
+            {
+              id: String(d.chartId),
+              brandSlug,
+              brandName: brand.name,
+              category,
+              gender,
+              needsData,
+              rowCount: d.rowCount,
+              updatedAt: new Date().toISOString(),
+              updatedBy: "admin",
+            },
+          ];
+        });
+      }
+    } catch (e) {
+      setMsg(errMsg(e));
     }
   };
 
@@ -577,7 +848,7 @@ function ChartsTab({
           <button
             onClick={load}
             disabled={loading || !brand}
-            className="mt-4 flex w-full items-center justify-center gap-2 bg-signal px-4 py-2.5 font-mono text-[10px] font-semibold tracking-[0.18em] text-bone uppercase transition-colors hover:bg-frost hover:text-bone disabled:opacity-40"
+            className="mt-4 flex w-full items-center justify-center gap-2 bg-signal px-4 py-2.5 font-mono text-[10px] font-semibold tracking-[0.18em] text-bone uppercase transition-colors hover:bg-frost hover:text-ink disabled:opacity-40"
           >
             {loading ? <Loader2 size={12} className="animate-spin" /> : <Table2 size={12} />}
             Load chart
@@ -748,12 +1019,12 @@ function ProductsTab({
   brands,
   products,
   setProducts,
-  call,
+  ops,
 }: {
   brands: AdminBrand[];
   products: AdminProduct[];
   setProducts: React.Dispatch<React.SetStateAction<AdminProduct[]>>;
-  call: (path: string, init?: RequestInit) => Promise<any>;
+  ops: Ops;
 }) {
   const [brandSlug, setBrandSlug] = useState<string>(brands[0]?.slug ?? "");
   const [name, setName] = useState("");
@@ -808,24 +1079,24 @@ function ProductsTab({
           <button
             disabled={!name.trim()}
             onClick={() => {
-              call("/api/admin/products", {
-                method: "POST",
-                body: JSON.stringify({
+              ops
+                .addProduct({
                   brandSlug,
                   category,
                   name: name.trim(),
                   priceInr: price ? Number(price) : undefined,
-                }),
-              }).then((d) => {
-                if (d.product) {
-                  setProducts((prev) => [
-                    ...prev,
-                    { ...d.product, brandName: brand?.name ?? "" },
-                  ]);
-                  setName("");
-                  setPrice("");
-                }
-              });
+                })
+                .then((p) => {
+                  if (p) {
+                    setProducts((prev) => [
+                      ...prev,
+                      { ...p, brandName: brand?.name ?? p.brandName },
+                    ]);
+                    setName("");
+                    setPrice("");
+                  }
+                })
+                .catch((e) => window.alert(errMsg(e)));
             }}
             className="flex w-full items-center justify-center gap-2 bg-bone px-4 py-2.5 font-mono text-[10px] font-semibold tracking-[0.16em] text-ink uppercase transition-colors hover:bg-frost disabled:opacity-30"
           >
@@ -854,9 +1125,10 @@ function ProductsTab({
             <button
               aria-label="Delete product"
               onClick={() =>
-                call(`/api/admin/products/${p.id}`, { method: "DELETE" }).then(() =>
-                  setProducts((prev) => prev.filter((x) => x.id !== p.id))
-                )
+                ops
+                  .deleteProduct(p.id)
+                  .then(() => setProducts((prev) => prev.filter((x) => x.id !== p.id)))
+                  .catch((e) => window.alert(errMsg(e)))
               }
               className="flex h-8 w-8 items-center justify-center border border-bone/15 text-fog transition-colors hover:border-frost hover:text-frost"
             >

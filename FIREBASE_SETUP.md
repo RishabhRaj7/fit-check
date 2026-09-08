@@ -1,152 +1,131 @@
-# Fit Check — Firebase (Firestore) Setup
+# Fit Check — Firebase Setup (web-app config)
 
-Fit Check uses **Cloud Firestore** as its primary database through the
-**Firebase Admin SDK** (server-side only). The browser never talks to
-Firestore directly — every read/write goes through the Next.js API routes.
+The app now uses the **public Firebase web-app config** — the six keys you
+get from *Project settings → Your apps → Web app*. No service account, no
+private key to copy.
 
-When the three `FIREBASE_*` env vars are present, the whole app (pages,
-converter, `/admin`, seed script) runs on Firestore. When they are absent,
-the app falls back to the local Postgres layer so development keeps working.
+How access is split:
 
-You do **not** need: Authentication, Hosting, Storage, client SDK config
-(`apiKey`, `messagingSenderId`, …), or any npm package beyond what is already
-installed (`firebase-admin`).
+- **Reads** (every page, the converter, the hero): the public config,
+  server-side in Next and via `/api/*`. Open reads, enforced by rules.
+- **Writes** (`/admin`, seed): an **authenticated account whose email is
+  hardcoded in `firestore.rules`** — Google sign-in in `/admin`, or
+  email/password in the seed script.
 
 ---
 
-## Part 1 — In the Firebase console (once)
+## 1. Create the project & database (Firebase console)
 
-### 1. Create the project
-1. Go to <https://console.firebase.google.com> and sign in with a Google account.
-2. **Add project** → name it e.g. `fit-check` → continue.
-3. Google Analytics: optional — you can disable it, the app doesn't use it.
-4. **Create project**. Note the **Project ID** shown under the name
-   (e.g. `fit-check-1a2b3`) — you'll need it in Part 2.
+1. <https://console.firebase.google.com> → **Add project** (e.g. `fit-check`).
+   Analytics optional.
+2. Project settings → **Usage and billing** → link a billing account
+   (required to activate Firestore; free Spark allowances apply).
+3. **Build → Firestore Database → Create database**
+   - Location: `asia-south1 (Mumbai)`
+   - Mode: **Production**
 
-### 2. Enable billing (required for Firestore)
-1. Project settings (gear icon) → **Usage and billing** → **Billing**.
-2. Link a billing account. The **free Spark allowance** still applies
-   (50k reads / 20k writes / 20k deletes per day, 1 GiB storage) — a billing
-   account is only required to activate Firestore; you stay on free tier
-   unless you exceed it.
+## 2. Enable the two auth providers
 
-### 3. Create the Firestore database
-1. Left sidebar → **Build** → **Firestore Database** → **Create database**.
-2. Location: pick **`asia-south1 (Mumbai)`** (lowest latency for India).
-3. Mode: **Production mode** (we deploy deny-all rules; the Admin SDK bypasses
-   rules, so the app keeps full access).
-4. Create.
+**Build → Authentication → Get started → Sign-in method**, enable:
 
-### 4. Generate a service-account key (this is the only "auth" step)
-1. Project settings (gear) → **Service accounts** tab.
-2. Confirm the SDK is **Firebase Admin SDK** → click
-   **Generate new private key** → **Generate key**.
-3. A JSON file downloads. It looks like:
+- **Google** — for `/admin` sign-in.
+- **Email/Password** — for the seed script (Node can't do a Google popup).
 
-```json
-{
-  "type": "service_account",
-  "project_id": "fit-check-1a2b3",
-  "private_key_id": "…",
-  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIE…\n-----END PRIVATE KEY-----\n",
-  "client_email": "firebase-adminsdk-xxxx@fit-check-1a2b3.iam.gserviceaccount.com",
-  "client_id": "…",
-  …
-}
+## 3. Register a web app & copy the config
+
+Project settings → **Your apps** → **Web** (`</>`) → register (any nickname).
+Copy the `firebaseConfig` object into your env, keeping these exact names
+(see `.env.example`):
+
+```bash
+FIREBASE_API_KEY=AIza…
+FIREBASE_AUTH_DOMAIN=fit-check.firebaseapp.com
+FIREBASE_PROJECT_ID=fit-check
+FIREBASE_STORAGE_BUCKET=fit-check.appspot.com
+FIREBASE_MESSAGING_SENDER_ID=123…
+FIREBASE_APP_ID=1:123:web:abc…
 ```
 
-Keep this file private. It is a root credential for your project.
+Locally: `.env`. On your host (Vercel etc.): platform Environment Variables,
+then redeploy/restart.
 
-### 5. (Optional but recommended) Deploy rules + indexes
-The repo ships `firebase.json`, `firestore.rules` (deny all client access) and
-`firestore.indexes.json` (composite indexes for the product queries).
+## 4. Put YOUR email into the rules, then deploy
+
+Edit `firestore.rules` — replace `owner@example.com` with the Google account
+email you will use as admin (the same email goes in `ADMIN_EMAIL`):
+
+```
+request.auth.token.email == "you@gmail.com";
+```
+
+Deploy:
 
 ```bash
 npm i -g firebase-tools
 firebase login
-firebase use --add        # pick your project
+firebase use --add          # pick the project
+firebase deploy --only firestore
+```
+
+(Also sets the composite indexes from `firestore.indexes.json`.)
+
+## 5. Seed Firestore with the brand data (once)
+
+```bash
+ADMIN_EMAIL=you@gmail.com ADMIN_PASSWORD='a-strong-password' npx tsx src/db/seed.ts
+```
+
+First run **creates** that email/password account in Firebase Auth
+(then you can also use it for email-link-style access if you ever want it);
+later runs just sign in. It writes 20 brands / 69 charts / 608 rows /
+45 products. Re-running is safe (clears and rewrites).
+
+> The `ADMIN_PASSWORD` account is the write credential — pick a real
+> password and keep it private. `/admin` itself uses **Google** sign-in and
+> never sees this password.
+
+## 6. Verify
+
+1. Restart/redeploy the app.
+2. `GET /api/health` → `{"ok":true,"dataSource":"firestore"}`
+   (`postgres` = the six FIREBASE_* vars weren't picked up).
+3. `/admin` → **Sign in with Google** with the rules email → full deck.
+   A different Google account can browse the deck but every write is denied
+   with a clear message.
+
+---
+
+## 7. User profiles (automatic — nothing to configure)
+
+Visitors who open `/profile` sign in with **Google** (Authentication →
+Google provider, enabled in step 2). Their size profile is stored at
+`users/{uid}` (`sizeProfile` map, same `{category}:{gender}` keys as the
+device profile) and is readable/writable **only by that user** per
+`firestore.rules`. On the next visit — any device — it is fetched back, so
+nothing needs to be re-entered.
+
+Device-only guest entries (IndexedDB) are merged up to Firestore
+automatically on first sign-in. With Firebase not configured, the site keeps
+the old device-only behaviour.
+
+If you edited the rules for your email, redeploy them so the `users/{uid}`
+block ships too:
+
+```bash
 firebase deploy --only firestore
 ```
 
 ---
 
-## Part 2 — Environment variables
-
-Map the downloaded JSON onto three env vars:
-
-| JSON field     | Env var                 |
-| -------------- | ----------------------- |
-| `project_id`   | `FIREBASE_PROJECT_ID`   |
-| `client_email` | `FIREBASE_CLIENT_EMAIL` |
-| `private_key`  | `FIREBASE_PRIVATE_KEY`  |
-
-### Local development
-Put them in `.env` (see `.env.example` for the template):
-
-```bash
-FIREBASE_PROJECT_ID=fit-check-1a2b3
-FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxx@fit-check-1a2b3.iam.gserviceaccount.com
-FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----
-MIIE…
------END PRIVATE KEY-----
-"
-```
-
-Notes:
-- The app normalises escaped line breaks, so a single-line value containing
-  literal `\n` sequences also works (that's the form most hosters need).
-- Never commit `.env`.
-
-### On your host (Vercel / other)
-Add the same three vars (plus `ADMIN_KEY` if you want a custom admin key) in
-the platform's **Environment Variables** settings, then redeploy/restart.
-For a single-line private key in Vercel, keep the `\n` sequences verbatim.
-
-### Optional
-- `ADMIN_KEY` — key required by `/admin` mutations (`x-admin-key` header).
-  Defaults to `sizing-admin` when unset.
-
----
-
-## Part 3 — Seed Firestore with the brand data (once)
-
-The seed script auto-detects the datasource. With the env vars set, run:
-
-```bash
-npx tsx src/db/seed.ts
-```
-
-It will print `Seeding Firestore: 20 brands, 69 charts, 608 rows, 45 products.`
-
-Firestore layout created:
-- `brands/{slug}` — name, slug, logoUrl, categories[], priority, needsData
-- `charts/{slug}__{category}__{gender}` — rows[] array of
-  `{ anchorValue, eu, uk, us, jpn, ind, label }`
-- `products/{autoId}` — brandSlug, category, name, slug, priceInr, imageUrl
-
-Re-running the seed is safe (it clears and rewrites the three collections).
-
----
-
-## Part 4 — Verify
-
-1. Restart the app (or redeploy).
-2. `GET /api/health` → `{"ok":true,"dataSource":"firestore"}`.
-   (`postgres` means the env vars weren't picked up.)
-3. `/admin` shows a `DATASOURCE: FIRESTORE` badge. New brands/charts you save
-   there now write straight to Firestore — adding a brand remains a form,
-   not a deploy.
-
----
-
 ## Troubleshooting
 
-- **`dataSource` still `postgres`** — env vars not loaded. Check spelling,
-  quotes around the private key, and restart the server.
-- **`error: invalid_grant` / signature errors** — the private key was mangled
-  (lost line breaks). Use the `\n` form or the multi-line quoted form exactly
-  as downloaded.
-- **`permission denied` on seed** — wrong project's key, or the service
-  account was deleted (Service accounts tab → regenerate).
-- **Queries slow at first** — Firestore builds the composite indexes after
-  `firebase deploy --only firestore`; single-field queries need no action.
+- **`dataSource` still `postgres`** — env vars not loaded; check spelling and
+  restart the server.
+- **`permission-denied` on writes** — signed-in email ≠ email in
+  `firestore.rules`, or the rules weren't redeployed after editing.
+- **Seed says "auth/operation-not-allowed"** — the Email/Password provider
+  isn't enabled (step 2).
+- **Seed says "auth/email-already-in-use"** — the account already exists;
+  just make sure `ADMIN_PASSWORD` matches it.
+- **Google popup blocked** — allow popups for the site, or use a regular
+  (non-private) browser window.

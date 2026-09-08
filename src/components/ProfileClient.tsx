@@ -3,15 +3,26 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowUpRight, Pencil, Trash2, X, Ruler } from "lucide-react";
+import type { User } from "firebase/auth";
+import {
+  ArrowUpRight,
+  CloudUpload,
+  Loader2,
+  LogOut,
+  Pencil,
+  Ruler,
+  Trash2,
+  X,
+} from "lucide-react";
 import { CATEGORIES, isCategory, type CategoryId } from "@/lib/categories";
 import { cn } from "@/lib/format";
+import { loadProfile, removeEntry, saveEntry, type Profile } from "@/lib/profile";
 import {
-  loadProfile,
-  removeEntry,
-  saveEntry,
-  type Profile,
-} from "@/lib/profile";
+  initClientFirebase,
+  onAuthChange,
+  signInGoogle,
+  signOutUser,
+} from "@/lib/firebase/clientAuth";
 import KnownSizePicker, {
   type LiteBrand,
   type PickedSize,
@@ -25,19 +36,33 @@ export default function ProfileClient({
   const [profile, setProfile] = useState<Profile>({});
   const [editing, setEditing] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [configured, setConfigured] = useState<boolean | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [gateBusy, setGateBusy] = useState(false);
 
-  useEffect(() => {
+  const reload = () => {
     void loadProfile().then((p) => {
       setProfile(p);
       setLoaded(true);
     });
-  }, []);
+  };
 
-  const keys = Object.keys(profile).sort();
-  const allCategories = Object.keys(brandSets) as CategoryId[];
-  const missing = allCategories.filter(
-    (c) => !keys.some((k) => k.startsWith(`${c}:`))
-  );
+  useEffect(() => {
+    let unsub: (() => void) | undefined;
+    initClientFirebase().then((ok) => {
+      setConfigured(ok);
+      if (ok) {
+        unsub = onAuthChange((u) => {
+          setUser(u);
+          reload();
+        });
+        return;
+      }
+      reload();
+    });
+    return () => unsub?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const onPick = (gender: string, cat: CategoryId) => async (v: PickedSize) => {
     await saveEntry(cat, gender, {
@@ -47,16 +72,88 @@ export default function ProfileClient({
       sourceSizeLabel: v.label,
       confidence: "exact",
     });
-    setProfile(await loadProfile());
+    reload();
     setEditing(null);
   };
 
-  if (!loaded) {
-    return <div className="min-h-40" />;
+  if (!loaded || configured === null) {
+    return (
+      <div className="flex min-h-56 items-center justify-center">
+        <Loader2 className="animate-spin text-frost" size={20} />
+      </div>
+    );
   }
+
+  /* -------- Firebase configured but signed out → sign-in gate -------- */
+  if (configured && !user) {
+    return (
+      <div className="mx-auto max-w-md border border-bone/12 bg-coal p-8">
+        <div className="flex items-center gap-3">
+          <CloudUpload size={18} className="text-frost" strokeWidth={1.8} />
+          <span className="font-mono text-[10px] tracking-[0.24em] text-fog">
+            PROFILE — SYNCED VIA FIREBASE
+          </span>
+        </div>
+        <h2 className="mt-4 font-display text-4xl tracking-tight text-bone">
+          SIGN IN TO SYNC<span className="text-frost">.</span>
+        </h2>
+        <p className="mt-4 text-sm leading-relaxed text-fog">
+          Your saved sizes live on your account — any device, every visit.
+          Sizes already measured on this device are merged up on first
+          sign-in.
+        </p>
+        <button
+          disabled={gateBusy}
+          onClick={() => {
+            setGateBusy(true);
+            signInGoogle().catch(() => setGateBusy(false));
+          }}
+          className="mt-6 flex w-full items-center justify-center gap-2 bg-signal px-4 py-3 font-mono text-[11px] font-semibold tracking-[0.2em] text-bone uppercase transition-colors hover:bg-frost hover:text-ink disabled:opacity-40"
+        >
+          {gateBusy ? (
+            <Loader2 size={13} className="animate-spin" />
+          ) : (
+            <CloudUpload size={13} strokeWidth={2.2} />
+          )}
+          Sign in with Google
+        </button>
+        <p className="mt-4 font-mono text-[10px] leading-relaxed tracking-[0.12em] text-fog">
+          ONLY YOUR SIZE PROFILE IS STORED — READABLE AND WRITABLE BY YOU
+          ALONE.
+        </p>
+      </div>
+    );
+  }
+
+  const keys = Object.keys(profile).sort();
+  const allCategories = Object.keys(brandSets) as CategoryId[];
+  const missing = allCategories.filter(
+    (c) => !keys.some((k) => k.startsWith(`${c}:`))
+  );
 
   return (
     <div>
+      {/* sync status */}
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        {user ? (
+          <>
+            <span className="flex items-center gap-2 border border-frost/40 px-3 py-1.5 font-mono text-[10px] tracking-[0.18em] text-frost uppercase">
+              <CloudUpload size={11} /> Synced — {user.email}
+            </span>
+            <button
+              onClick={() => void signOutUser()}
+              className="flex items-center gap-1.5 font-mono text-[10px] tracking-[0.18em] text-fog uppercase transition-colors hover:text-bone"
+            >
+              <LogOut size={11} /> Sign out
+            </button>
+          </>
+        ) : (
+          <span className="border border-bone/20 px-3 py-1.5 font-mono text-[10px] tracking-[0.18em] text-fog uppercase">
+            Stored on this device
+          </span>
+        )}
+      </div>
+
       {keys.length === 0 ? (
         <div className="border border-dashed border-bone/20 p-10 text-center md:p-16">
           <Ruler size={20} className="mx-auto text-frost" strokeWidth={1.8} />
@@ -69,7 +166,7 @@ export default function ProfileClient({
           </p>
           <Link
             href="/onboarding"
-            className="mt-6 inline-flex items-center gap-2 bg-signal px-6 py-3.5 font-mono text-[11px] font-semibold tracking-[0.2em] text-bone uppercase transition-colors hover:bg-bone hover:text-ink"
+            className="mt-6 inline-flex items-center gap-2 bg-signal px-6 py-3.5 font-mono text-[11px] font-semibold tracking-[0.2em] text-bone uppercase transition-colors hover:bg-frost hover:text-ink"
           >
             Start onboarding <ArrowUpRight size={14} strokeWidth={2.4} />
           </Link>
@@ -114,7 +211,7 @@ export default function ProfileClient({
                         "px-2 py-1 font-mono text-[9px] tracking-[0.2em]",
                         entry.confidence === "exact"
                           ? "bg-bone text-ink"
-                          : "border border-signal text-frost"
+                          : "border border-frost text-frost"
                       )}
                     >
                       {entry.confidence === "exact" ? "EXACT" : "INFERRED"}
@@ -123,18 +220,16 @@ export default function ProfileClient({
                       <button
                         aria-label="Edit"
                         onClick={() => setEditing(isEditing ? null : key)}
-                        className="flex h-8 w-8 items-center justify-center border border-bone/15 text-fog transition-colors hover:border-signal hover:text-frost"
+                        className="flex h-8 w-8 items-center justify-center border border-bone/15 text-fog transition-colors hover:border-frost hover:text-frost"
                       >
                         {isEditing ? <X size={13} /> : <Pencil size={13} />}
                       </button>
                       <button
                         aria-label="Remove"
                         onClick={() => {
-                          void removeEntry(key).then(() =>
-                            loadProfile().then(setProfile)
-                          );
+                          void removeEntry(key).then(reload);
                         }}
-                        className="flex h-8 w-8 items-center justify-center border border-bone/15 text-fog transition-colors hover:border-signal hover:text-frost"
+                        className="flex h-8 w-8 items-center justify-center border border-bone/15 text-fog transition-colors hover:border-frost hover:text-frost"
                       >
                         <Trash2 size={13} />
                       </button>
@@ -169,7 +264,7 @@ export default function ProfileClient({
               <Link
                 key={c}
                 href={`/category/${c}`}
-                className="group flex items-center gap-2 border border-bone/20 px-4 py-2.5 font-mono text-[10px] tracking-[0.18em] text-bone uppercase transition-colors hover:border-signal hover:text-frost"
+                className="group flex items-center gap-2 border border-bone/20 px-4 py-2.5 font-mono text-[10px] tracking-[0.18em] text-bone uppercase transition-colors hover:border-frost hover:text-frost"
               >
                 {CATEGORIES[c].label}
                 <ArrowUpRight

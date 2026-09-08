@@ -70,6 +70,7 @@ export default async function AdminPage() {
         </div>
       </div>
       <AdminApp
+        mode={dataSourceName}
         brands={adminBrands}
         charts={adminCharts}
         products={adminProducts}

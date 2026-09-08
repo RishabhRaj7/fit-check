@@ -701,10 +701,6 @@
     min-height: calc(var(--spacing) * 10);
   }
 
-  .min-h-40 {
-    min-height: calc(var(--spacing) * 40);
-  }
-
   .min-h-56 {
     min-height: calc(var(--spacing) * 56);
   }

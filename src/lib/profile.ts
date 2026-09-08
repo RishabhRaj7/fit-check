@@ -1,8 +1,20 @@
 "use client";
 
+import type { User } from "firebase/auth";
+import {
+  clientFs,
+  initClientFirebase,
+  onAuthChange,
+} from "./firebase/clientAuth";
+
 /**
- * Guest size profile, persisted in IndexedDB (no sign-in friction).
- * Store: sizinghub / profile — key: "{category}:{gender}", value: ProfileEntry.
+ * Size profile facade.
+ *  - Signed in with Firebase  → stored on Firestore at users/{uid}.sizeProfile,
+ *    fetched back on every future visit (any device).
+ *  - Signed out / no Firebase → device-local IndexedDB guest profile.
+ * Local guest entries are merged up to Firestore on first sign-in.
+ *
+ * Store shape (both backends): key "{category}:{gender}" → ProfileEntry.
  */
 
 export interface ProfileEntry {
@@ -16,13 +28,15 @@ export interface ProfileEntry {
 
 export type Profile = Record<string, ProfileEntry>;
 
-const DB_NAME = "sizinghub";
-const STORE = "profile";
-const VERSION = 1;
-
 export function entryKey(category: string, gender: string) {
   return `${category}:${gender}`;
 }
+
+/* ───────────────────────── local backend (IndexedDB) ───────────────────── */
+
+const DB_NAME = "sizinghub";
+const STORE = "profile";
+const VERSION = 1;
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -61,7 +75,7 @@ function tx<T>(
   );
 }
 
-export async function loadProfile(): Promise<Profile> {
+async function localLoad(): Promise<Profile> {
   try {
     const db = await openDb();
     return await new Promise<Profile>((resolve, reject) => {
@@ -91,39 +105,15 @@ export async function loadProfile(): Promise<Profile> {
   }
 }
 
-export async function getEntry(
-  category: string,
-  gender: string
-): Promise<ProfileEntry | null> {
+async function localSave(key: string, entry: ProfileEntry): Promise<void> {
   try {
-    const exact = await tx<ProfileEntry | undefined>("readonly", (s) =>
-      s.get(entryKey(category, gender))
-    );
-    if (exact) return exact;
-    const unisex = await tx<ProfileEntry | undefined>("readonly", (s) =>
-      s.get(entryKey(category, "unisex"))
-    );
-    return unisex ?? null;
+    await tx("readwrite", (s) => s.put(entry, key));
   } catch {
-    return null;
+    // storage unavailable — no-op
   }
 }
 
-export async function saveEntry(
-  category: string,
-  gender: string,
-  entry: Omit<ProfileEntry, "updatedAt">
-): Promise<void> {
-  try {
-    await tx("readwrite", (s) =>
-      s.put({ ...entry, updatedAt: Date.now() }, entryKey(category, gender))
-    );
-  } catch {
-    // storage unavailable — profile simply won't persist
-  }
-}
-
-export async function removeEntry(key: string): Promise<void> {
+async function localRemove(key: string): Promise<void> {
   try {
     await tx("readwrite", (s) => s.delete(key));
   } catch {
@@ -131,9 +121,163 @@ export async function removeEntry(key: string): Promise<void> {
   }
 }
 
-export async function clearProfile(): Promise<void> {
+async function localClear(): Promise<void> {
   try {
     await tx("readwrite", (s) => s.clear());
+  } catch {
+    // no-op
+  }
+}
+
+/* ───────────────────────────── auth session ────────────────────────────── */
+
+let authStarted = false;
+let firstAuth: Promise<void> | null = null;
+let currentUser: User | null = null;
+
+async function firebaseReady(): Promise<boolean> {
+  const ok = await initClientFirebase();
+  if (!ok) return false;
+  if (!authStarted) {
+    authStarted = true;
+    firstAuth = new Promise((resolve) =>
+      onAuthChange((u) => {
+        currentUser = u;
+        resolve();
+      })
+    );
+  }
+  await firstAuth;
+  return true;
+}
+
+export function currentUserNow(): User | null {
+  return currentUser;
+}
+
+/** True once we know Firebase is configured (regardless of sign-in). */
+export async function firebaseConfigured(): Promise<boolean> {
+  return initClientFirebase();
+}
+
+/* ─────────────────────────── cloud backend ─────────────────────────────── */
+
+async function cloudProfile(uid: string): Promise<Profile> {
+  const { doc, getDoc } = await import("firebase/firestore");
+  const fs = clientFs();
+  if (!fs) return {};
+  const snap = await getDoc(doc(fs, "users", uid));
+  if (!snap.exists()) return {};
+  return ((snap.data() as { sizeProfile?: Profile }).sizeProfile ?? {}) as Profile;
+}
+
+async function cloudWriteMeta(user: User) {
+  return {
+    email: user.email ?? null,
+    displayName: user.displayName ?? null,
+    lastSeenAt: Date.now(),
+  };
+}
+
+/* ───────────────────────────── facade API ──────────────────────────────── */
+
+export async function loadProfile(): Promise<Profile> {
+  try {
+    const ok = await firebaseReady();
+    if (ok && currentUser) {
+      const cloud = await cloudProfile(currentUser.uid);
+      const local = await localLoad();
+      // one-time guest → cloud merge
+      if (Object.keys(cloud).length === 0 && Object.keys(local).length > 0) {
+        const { doc, setDoc } = await import("firebase/firestore");
+        const fs = clientFs();
+        if (fs) {
+          await setDoc(
+            doc(fs, "users", currentUser.uid),
+            {
+              ...(await cloudWriteMeta(currentUser)),
+              createdAt: Date.now(),
+              sizeProfile: local,
+            },
+            { merge: true }
+          );
+        }
+        return local;
+      }
+      return cloud;
+    }
+    return await localLoad();
+  } catch {
+    return localLoad();
+  }
+}
+
+export async function getEntry(
+  category: string,
+  gender: string
+): Promise<ProfileEntry | null> {
+  const p = await loadProfile();
+  return p[entryKey(category, gender)] ?? p[entryKey(category, "unisex")] ?? null;
+}
+
+export async function saveEntry(
+  category: string,
+  gender: string,
+  entry: Omit<ProfileEntry, "updatedAt">
+): Promise<void> {
+  const full: ProfileEntry = { ...entry, updatedAt: Date.now() };
+  const key = entryKey(category, gender);
+  await localSave(key, full);
+  try {
+    const ok = await firebaseReady();
+    if (ok && currentUser) {
+      const { doc, setDoc } = await import("firebase/firestore");
+      const fs = clientFs();
+      if (fs) {
+        await setDoc(
+          doc(fs, "users", currentUser.uid),
+          {
+            ...(await cloudWriteMeta(currentUser)),
+            [`sizeProfile.${key}`]: full,
+          },
+          { merge: true }
+        );
+      }
+    }
+  } catch {
+    // cloud unavailable — local copy already saved
+  }
+}
+
+export async function removeEntry(key: string): Promise<void> {
+  await localRemove(key);
+  try {
+    const ok = await firebaseReady();
+    if (ok && currentUser) {
+      const { deleteField, doc, updateDoc } = await import("firebase/firestore");
+      const fs = clientFs();
+      if (fs) {
+        await updateDoc(doc(fs, "users", currentUser.uid), {
+          [`sizeProfile.${key}`]: deleteField(),
+        });
+      }
+    }
+  } catch {
+    // no-op
+  }
+}
+
+export async function clearProfile(): Promise<void> {
+  await localClear();
+  try {
+    const ok = await firebaseReady();
+    if (ok && currentUser) {
+      const { doc, updateDoc } = await import("firebase/firestore");
+      const fs = clientFs();
+      if (fs) {
+        await updateDoc(doc(fs, "users", currentUser.uid), { sizeProfile: {} });
+      }
+    }
   } catch {
     // no-op
   }
