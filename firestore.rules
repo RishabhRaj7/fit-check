@@ -1,0 +1,12 @@
+rules_version = '2';
+
+// Fit Check talks to Firestore exclusively through the Firebase Admin SDK
+// (server-side), which bypasses security rules. The browser never touches
+// Firestore directly, so the correct default is to deny all client access.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

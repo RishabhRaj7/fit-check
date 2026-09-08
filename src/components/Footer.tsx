@@ -7,8 +7,8 @@ export default function Footer() {
       <div className="mx-auto max-w-[1600px] px-4 pt-16 pb-8 md:px-8">
         <div className="flex flex-col gap-12 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="font-display text-[clamp(4rem,14vw,11rem)] leading-[0.85] tracking-tight text-stroke select-none">
-              SIZEHUB
+            <p className="font-display text-[clamp(3.4rem,12.5vw,10rem)] leading-[0.85] tracking-tight text-stroke select-none whitespace-nowrap">
+              FIT CHECK
             </p>
             <p className="mt-4 max-w-sm text-sm leading-relaxed text-fog">
               Sizes in UK / IND, EU, US and JPN. Anchored to your body, not to
@@ -55,7 +55,7 @@ export default function Footer() {
           </div>
         </div>
         <div className="mt-14 flex flex-col gap-2 border-t border-bone/10 pt-6 font-mono text-[10px] tracking-[0.2em] text-fog md:flex-row md:items-center md:justify-between">
-          <span>SIZING HUB — 2026</span>
+          <span>FIT CHECK — 2026</span>
           <span>
             A NEW BRAND IS A FORM, NOT A DEPLOY<span className="text-frost">.</span>
           </span>

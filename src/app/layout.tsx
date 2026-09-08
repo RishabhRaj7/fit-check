@@ -21,8 +21,8 @@ const archivo = Archivo({
 
 export const metadata: Metadata = {
   title: {
-    default: "SIZEHUB — Know Your Size In Every Brand",
-    template: "%s — SIZEHUB",
+    default: "FIT CHECK — Know Your Size In Every Brand",
+    template: "%s — FIT CHECK",
   },
   description:
     "Cross-brand size conversion for India. Anchor once on your foot, chest or waist measurement — convert into Nike, Adidas, Levi's, Zara and 20+ more brands instantly.",

@@ -8,7 +8,7 @@ export default function Nav() {
       <div className="mx-auto flex h-14 max-w-[1600px] items-center justify-between px-4 md:px-8">
         <Link href="/" className="group flex items-baseline gap-1">
           <span className="font-display text-xl tracking-wide text-bone">
-            SIZEHUB
+            FIT CHECK
           </span>
           <span className="mb-[2px] inline-block h-2 w-2 bg-signal transition-transform group-hover:-translate-y-0.5" />
         </Link>

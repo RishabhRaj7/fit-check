@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 
 const BONE = "#f5f5f0";
 
@@ -18,10 +19,17 @@ interface Tick {
 
 /**
  * The measuring tape itself: heel housing + tape body + cm ticks with
- * numeric labels. Slides in from the left on mount; a viewBox-aligned
- * cover rect (driven by the marker) retracts/extends the visible tape.
+ * numeric labels. Slides in from the left after mount; the tick marks then
+ * cascade in like a sweep; a viewBox-aligned cover rect (driven by the
+ * marker) retracts/extends the visible tape.
  */
 export default function TapeMeasure({ maxCm }: { maxCm: number }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setMounted(true), 60);
+    return () => clearTimeout(t);
+  }, []);
+
   const ticks: Tick[] = [];
   for (let cm = 0; cm <= maxCm + 1; cm += 0.5) {
     ticks.push({ cm, x: xOf(cm), major: Number.isInteger(cm) });
@@ -29,23 +37,20 @@ export default function TapeMeasure({ maxCm }: { maxCm: number }) {
 
   return (
     <>
-      {/* sliding group: case + body + ticks */}
+      {/* sliding group: body + ticks */}
       <motion.g
-        initial={{ x: -560 }}
-        animate={{ x: 0 }}
-        transition={{ duration: 0.5, delay: 0.28, ease: [0.22, 1, 0.36, 1] }}
+        initial={{ x: -620, opacity: 0 }}
+        animate={{ x: mounted ? 0 : -620, opacity: mounted ? 1 : 0 }}
+        transition={{ duration: 0.7, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
       >
         {/* tape body */}
-        <motion.rect
+        <rect
           x={ANCHOR_X}
           y={TAPE_Y - 13}
           height={26}
           width={xOf(maxCm + 1) - ANCHOR_X}
           fill={BONE}
           fillOpacity={0.07}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5, duration: 0.3 }}
         />
         <line
           x1={ANCHOR_X}
@@ -64,13 +69,13 @@ export default function TapeMeasure({ maxCm }: { maxCm: number }) {
           strokeOpacity={0.35}
         />
 
-        {/* ticks — stagger in along the tape */}
+        {/* ticks — cascade in left to right after the slide */}
         {ticks.map((t) => (
           <motion.g
             key={t.cm}
             initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.55 + t.cm * 0.02, duration: 0.2 }}
+            animate={{ opacity: mounted ? 1 : 0 }}
+            transition={{ delay: 0.62 + t.cm * 0.03, duration: 0.16 }}
           >
             <line
               x1={t.x}
@@ -83,7 +88,7 @@ export default function TapeMeasure({ maxCm }: { maxCm: number }) {
             />
             {t.major && (
               <text
-                x={t.x - (t.cm >= 10 ? 0 : 0)}
+                x={t.x}
                 y={TAPE_Y + 9.5}
                 fontSize={7.5}
                 textAnchor="middle"
@@ -101,8 +106,8 @@ export default function TapeMeasure({ maxCm }: { maxCm: number }) {
       {/* case housing at the heel — drawn after cover so it never clips */}
       <motion.g
         initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.3, duration: 0.3 }}
+        animate={{ opacity: mounted ? 1 : 0 }}
+        transition={{ delay: 0.32, duration: 0.3 }}
       >
         <rect
           x={52}

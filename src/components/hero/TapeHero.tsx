@@ -274,21 +274,23 @@ export default function TapeHero({
         DRAG THE TANG — SNAPS EVERY 0.5 CM
       </motion.p>
 
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 1.35, duration: 0.4 }}
-        className="absolute right-0 bottom-2 left-0 md:left-auto"
-      >
-        <BrandSelector
-          brands={brands}
-          active={brand}
-          onSelect={(s) => {
-            setBrand(s);
-            runConvert(committed, s, true);
-          }}
-        />
-      </motion.div>
+      {/* vertical brand rail — right edge, centered on the ruler line */}
+      <div className="absolute top-1/2 right-0 z-20 -translate-y-1/2 md:right-3">
+        <motion.div
+          initial={{ opacity: 0, x: 14 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 1.35, duration: 0.4 }}
+        >
+          <BrandSelector
+            brands={brands}
+            active={brand}
+            onSelect={(s) => {
+              setBrand(s);
+              runConvert(committed, s, true);
+            }}
+          />
+        </motion.div>
+      </div>
     </div>
   );
 }
