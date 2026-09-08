@@ -183,20 +183,35 @@ __turbopack_context__.s([
 ]);
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/jsx-dev-runtime.js [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$framer$2d$motion$2f$dist$2f$es$2f$render$2f$components$2f$motion$2f$proxy$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/framer-motion/dist/es/render/components/motion/proxy.mjs [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/index.js [app-client] (ecmascript)");
+;
+var _s = __turbopack_context__.k.signature();
 "use client";
 ;
 ;
 const BONE = "#f5f5f0";
 const FROST = "#8cb8dd";
 function FootOutline({ scale }) {
+    _s();
+    const [mounted, setMounted] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
+        "FootOutline.useEffect": ()=>{
+            const t = setTimeout({
+                "FootOutline.useEffect.t": ()=>setMounted(true)
+            }["FootOutline.useEffect.t"], 60);
+            return ({
+                "FootOutline.useEffect": ()=>clearTimeout(t)
+            })["FootOutline.useEffect"];
+        }
+    }["FootOutline.useEffect"], []);
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$framer$2d$motion$2f$dist$2f$es$2f$render$2f$components$2f$motion$2f$proxy$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["motion"].g, {
         style: {
             scale,
-            transformOrigin: "330px 315px"
+            transformOrigin: "320px 300px"
         },
         children: [
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$framer$2d$motion$2f$dist$2f$es$2f$render$2f$components$2f$motion$2f$proxy$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["motion"].path, {
-                d: "M 118 236 C 92 258, 78 292, 84 328 C 90 372, 112 408, 152 420 C 200 434, 248 424, 282 392 C 306 370, 314 344, 306 316 C 298 282, 306 250, 336 230 C 376 202, 430 192, 470 206 C 504 218, 524 252, 516 292 C 510 326, 486 350, 448 358 C 396 370, 338 366, 292 344 C 252 326, 222 300, 196 268 C 176 244, 150 236, 130 232 C 124 231, 120 233, 118 236 Z",
+                d: "M 86 305 C 84 262, 96 240, 122 232 C 160 220, 210 236, 252 244 C 300 252, 350 224, 414 210 C 448 202, 480 206, 502 220 C 534 238, 556 256, 556 284 C 556 314, 544 330, 522 344 C 492 362, 460 380, 424 386 C 372 394, 330 372, 292 366 C 246 360, 200 380, 158 376 C 118 372, 88 348, 86 305 Z",
                 fill: "none",
                 stroke: BONE,
                 strokeOpacity: 0.85,
@@ -207,12 +222,12 @@ function FootOutline({ scale }) {
                     opacity: 0
                 },
                 animate: {
-                    pathLength: 1,
-                    opacity: 1
+                    pathLength: mounted ? 1 : 0,
+                    opacity: mounted ? 1 : 0
                 },
                 transition: {
                     duration: 0.6,
-                    delay: 0.1,
+                    delay: 0.12,
                     ease: [
                         0.4,
                         0,
@@ -222,7 +237,7 @@ function FootOutline({ scale }) {
                 }
             }, void 0, false, {
                 fileName: "[project]/src/components/hero/tape/FootOutline.tsx",
-                lineNumber: 17,
+                lineNumber: 24,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$framer$2d$motion$2f$dist$2f$es$2f$render$2f$components$2f$motion$2f$proxy$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["motion"].g, {
@@ -230,90 +245,66 @@ function FootOutline({ scale }) {
                     opacity: 0
                 },
                 animate: {
-                    opacity: 1
+                    opacity: mounted ? 1 : 0
                 },
                 transition: {
                     duration: 0.4,
-                    delay: 0.75
+                    delay: 0.78
                 },
                 children: [
-                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("line", {
-                        x1: 76,
-                        y1: 352,
-                        x2: 556,
-                        y2: 352,
-                        stroke: BONE,
-                        strokeOpacity: 0.3,
-                        strokeWidth: 1,
-                        strokeDasharray: "3 6"
-                    }, void 0, false, {
-                        fileName: "[project]/src/components/hero/tape/FootOutline.tsx",
-                        lineNumber: 48,
-                        columnNumber: 9
-                    }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("path", {
-                        d: "M 556 348 L 566 352 L 556 356 Z",
-                        fill: BONE,
-                        fillOpacity: 0.4
+                        d: "M 150 342 C 230 322, 300 328, 386 352",
+                        fill: "none",
+                        stroke: BONE,
+                        strokeOpacity: 0.22,
+                        strokeWidth: 1,
+                        strokeDasharray: "2 5"
                     }, void 0, false, {
                         fileName: "[project]/src/components/hero/tape/FootOutline.tsx",
-                        lineNumber: 58,
-                        columnNumber: 9
-                    }, this),
-                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("text", {
-                        x: 76,
-                        y: 344,
-                        fontSize: 7.5,
-                        letterSpacing: 2,
-                        fill: BONE,
-                        fillOpacity: 0.35,
-                        children: "AXIS — HEEL → TOE"
-                    }, void 0, false, {
-                        fileName: "[project]/src/components/hero/tape/FootOutline.tsx",
-                        lineNumber: 59,
+                        lineNumber: 53,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("line", {
-                        x1: 432,
-                        y1: 206,
-                        x2: 432,
-                        y2: 368,
+                        x1: 430,
+                        y1: 204,
+                        x2: 430,
+                        y2: 390,
                         stroke: BONE,
                         strokeOpacity: 0.28,
                         strokeWidth: 1,
                         strokeDasharray: "2 5"
                     }, void 0, false, {
                         fileName: "[project]/src/components/hero/tape/FootOutline.tsx",
-                        lineNumber: 71,
+                        lineNumber: 63,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("line", {
-                        x1: 424,
-                        y1: 206,
-                        x2: 440,
-                        y2: 206,
+                        x1: 422,
+                        y1: 204,
+                        x2: 438,
+                        y2: 204,
                         stroke: BONE,
                         strokeOpacity: 0.4
                     }, void 0, false, {
                         fileName: "[project]/src/components/hero/tape/FootOutline.tsx",
-                        lineNumber: 81,
+                        lineNumber: 73,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("line", {
-                        x1: 424,
-                        y1: 368,
-                        x2: 440,
-                        y2: 368,
+                        x1: 422,
+                        y1: 390,
+                        x2: 438,
+                        y2: 390,
                         stroke: BONE,
                         strokeOpacity: 0.4
                     }, void 0, false, {
                         fileName: "[project]/src/components/hero/tape/FootOutline.tsx",
-                        lineNumber: 82,
+                        lineNumber: 74,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("text", {
-                        x: 446,
-                        y: 210,
+                        x: 444,
+                        y: 208,
                         fontSize: 7.5,
                         letterSpacing: 2,
                         fill: BONE,
@@ -321,12 +312,12 @@ function FootOutline({ scale }) {
                         children: "BALL"
                     }, void 0, false, {
                         fileName: "[project]/src/components/hero/tape/FootOutline.tsx",
-                        lineNumber: 83,
+                        lineNumber: 75,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("circle", {
-                        cx: 510,
-                        cy: 258,
+                        cx: 540,
+                        cy: 284,
                         r: 9,
                         fill: "none",
                         stroke: FROST,
@@ -334,37 +325,37 @@ function FootOutline({ scale }) {
                         strokeWidth: 1
                     }, void 0, false, {
                         fileName: "[project]/src/components/hero/tape/FootOutline.tsx",
-                        lineNumber: 95,
+                        lineNumber: 87,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("line", {
-                        x1: 510,
-                        y1: 244,
-                        x2: 510,
-                        y2: 272,
+                        x1: 540,
+                        y1: 270,
+                        x2: 540,
+                        y2: 298,
                         stroke: FROST,
                         strokeOpacity: 0.5
                     }, void 0, false, {
                         fileName: "[project]/src/components/hero/tape/FootOutline.tsx",
-                        lineNumber: 96,
+                        lineNumber: 88,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("line", {
-                        x1: 496,
-                        y1: 258,
-                        x2: 524,
-                        y2: 258,
+                        x1: 526,
+                        y1: 284,
+                        x2: 554,
+                        y2: 284,
                         stroke: FROST,
                         strokeOpacity: 0.5
                     }, void 0, false, {
                         fileName: "[project]/src/components/hero/tape/FootOutline.tsx",
-                        lineNumber: 97,
+                        lineNumber: 89,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/hero/tape/FootOutline.tsx",
-                lineNumber: 42,
+                lineNumber: 47,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$framer$2d$motion$2f$dist$2f$es$2f$render$2f$components$2f$motion$2f$proxy$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["motion"].g, {
@@ -372,16 +363,88 @@ function FootOutline({ scale }) {
                     opacity: 0
                 },
                 animate: {
-                    opacity: 1
+                    opacity: mounted ? 1 : 0
                 },
                 transition: {
                     duration: 0.5,
                     delay: 1.0
                 },
                 children: [
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("line", {
+                        x1: 86,
+                        y1: 436,
+                        x2: 556,
+                        y2: 436,
+                        stroke: BONE,
+                        strokeOpacity: 0.3,
+                        strokeWidth: 1,
+                        strokeDasharray: "3 6"
+                    }, void 0, false, {
+                        fileName: "[project]/src/components/hero/tape/FootOutline.tsx",
+                        lineNumber: 98,
+                        columnNumber: 9
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("line", {
+                        x1: 86,
+                        y1: 428,
+                        x2: 86,
+                        y2: 444,
+                        stroke: BONE,
+                        strokeOpacity: 0.4
+                    }, void 0, false, {
+                        fileName: "[project]/src/components/hero/tape/FootOutline.tsx",
+                        lineNumber: 108,
+                        columnNumber: 9
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("line", {
+                        x1: 556,
+                        y1: 428,
+                        x2: 556,
+                        y2: 444,
+                        stroke: BONE,
+                        strokeOpacity: 0.4
+                    }, void 0, false, {
+                        fileName: "[project]/src/components/hero/tape/FootOutline.tsx",
+                        lineNumber: 109,
+                        columnNumber: 9
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("path", {
+                        d: "M 96 432 L 86 436 L 96 440",
+                        fill: "none",
+                        stroke: BONE,
+                        strokeOpacity: 0.4
+                    }, void 0, false, {
+                        fileName: "[project]/src/components/hero/tape/FootOutline.tsx",
+                        lineNumber: 110,
+                        columnNumber: 9
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("path", {
+                        d: "M 546 432 L 556 436 L 546 440",
+                        fill: "none",
+                        stroke: BONE,
+                        strokeOpacity: 0.4
+                    }, void 0, false, {
+                        fileName: "[project]/src/components/hero/tape/FootOutline.tsx",
+                        lineNumber: 111,
+                        columnNumber: 9
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("text", {
+                        x: 321,
+                        y: 452,
+                        fontSize: 7.5,
+                        letterSpacing: 3,
+                        textAnchor: "middle",
+                        fill: BONE,
+                        fillOpacity: 0.35,
+                        children: "AXIS — HEEL → TOE"
+                    }, void 0, false, {
+                        fileName: "[project]/src/components/hero/tape/FootOutline.tsx",
+                        lineNumber: 112,
+                        columnNumber: 9
+                    }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("text", {
                         x: 84,
-                        y: 470,
+                        y: 474,
                         fontSize: 8,
                         letterSpacing: 3,
                         fill: BONE,
@@ -389,12 +452,12 @@ function FootOutline({ scale }) {
                         children: "FIG. 01 — TOP-DOWN INSOLE"
                     }, void 0, false, {
                         fileName: "[project]/src/components/hero/tape/FootOutline.tsx",
-                        lineNumber: 106,
+                        lineNumber: 124,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("text", {
                         x: 84,
-                        y: 486,
+                        y: 490,
                         fontSize: 8,
                         letterSpacing: 3,
                         fill: BONE,
@@ -402,7 +465,7 @@ function FootOutline({ scale }) {
                         children: "SCALE 1:1 · 16 UNITS / CM"
                     }, void 0, false, {
                         fileName: "[project]/src/components/hero/tape/FootOutline.tsx",
-                        lineNumber: 116,
+                        lineNumber: 127,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("text", {
@@ -415,22 +478,23 @@ function FootOutline({ scale }) {
                         children: "FOOT LENGTH"
                     }, void 0, false, {
                         fileName: "[project]/src/components/hero/tape/FootOutline.tsx",
-                        lineNumber: 126,
+                        lineNumber: 130,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/hero/tape/FootOutline.tsx",
-                lineNumber: 101,
+                lineNumber: 93,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/src/components/hero/tape/FootOutline.tsx",
-        lineNumber: 15,
+        lineNumber: 22,
         columnNumber: 5
     }, this);
 }
+_s(FootOutline, "LrrVfNW3d1raFE0BNzCTILYmIfo=");
 _c = FootOutline;
 var _c;
 __turbopack_context__.k.register(_c, "FootOutline");
@@ -455,6 +519,9 @@ __turbopack_context__.s([
 ]);
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/jsx-dev-runtime.js [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$framer$2d$motion$2f$dist$2f$es$2f$render$2f$components$2f$motion$2f$proxy$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/framer-motion/dist/es/render/components/motion/proxy.mjs [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/index.js [app-client] (ecmascript)");
+;
+var _s = __turbopack_context__.k.signature();
 "use client";
 ;
 ;
@@ -464,6 +531,18 @@ const ANCHOR_X = 100; // x of 0 cm (heel anchor)
 const TAPE_Y = 300; // tape axis
 const xOf = (cm)=>ANCHOR_X + cm * PPC;
 function TapeMeasure({ maxCm }) {
+    _s();
+    const [mounted, setMounted] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
+        "TapeMeasure.useEffect": ()=>{
+            const t = setTimeout({
+                "TapeMeasure.useEffect.t": ()=>setMounted(true)
+            }["TapeMeasure.useEffect.t"], 60);
+            return ({
+                "TapeMeasure.useEffect": ()=>clearTimeout(t)
+            })["TapeMeasure.useEffect"];
+        }
+    }["TapeMeasure.useEffect"], []);
     const ticks = [];
     for(let cm = 0; cm <= maxCm + 1; cm += 0.5){
         ticks.push({
@@ -476,42 +555,34 @@ function TapeMeasure({ maxCm }) {
         children: [
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$framer$2d$motion$2f$dist$2f$es$2f$render$2f$components$2f$motion$2f$proxy$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["motion"].g, {
                 initial: {
-                    x: -560
+                    x: -620,
+                    opacity: 0
                 },
                 animate: {
-                    x: 0
+                    x: mounted ? 0 : -620,
+                    opacity: mounted ? 1 : 0
                 },
                 transition: {
-                    duration: 0.5,
-                    delay: 0.28,
+                    duration: 0.7,
+                    delay: 0.3,
                     ease: [
-                        0.22,
+                        0.16,
                         1,
-                        0.36,
+                        0.3,
                         1
                     ]
                 },
                 children: [
-                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$framer$2d$motion$2f$dist$2f$es$2f$render$2f$components$2f$motion$2f$proxy$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["motion"].rect, {
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("rect", {
                         x: ANCHOR_X,
                         y: TAPE_Y - 13,
                         height: 26,
                         width: xOf(maxCm + 1) - ANCHOR_X,
                         fill: BONE,
-                        fillOpacity: 0.07,
-                        initial: {
-                            opacity: 0
-                        },
-                        animate: {
-                            opacity: 1
-                        },
-                        transition: {
-                            delay: 0.5,
-                            duration: 0.3
-                        }
+                        fillOpacity: 0.07
                     }, void 0, false, {
                         fileName: "[project]/src/components/hero/tape/TapeMeasure.tsx",
-                        lineNumber: 39,
+                        lineNumber: 47,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("line", {
@@ -523,7 +594,7 @@ function TapeMeasure({ maxCm }) {
                         strokeOpacity: 0.35
                     }, void 0, false, {
                         fileName: "[project]/src/components/hero/tape/TapeMeasure.tsx",
-                        lineNumber: 50,
+                        lineNumber: 55,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("line", {
@@ -535,7 +606,7 @@ function TapeMeasure({ maxCm }) {
                         strokeOpacity: 0.35
                     }, void 0, false, {
                         fileName: "[project]/src/components/hero/tape/TapeMeasure.tsx",
-                        lineNumber: 58,
+                        lineNumber: 63,
                         columnNumber: 9
                     }, this),
                     ticks.map((t)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$framer$2d$motion$2f$dist$2f$es$2f$render$2f$components$2f$motion$2f$proxy$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["motion"].g, {
@@ -543,11 +614,11 @@ function TapeMeasure({ maxCm }) {
                                 opacity: 0
                             },
                             animate: {
-                                opacity: 1
+                                opacity: mounted ? 1 : 0
                             },
                             transition: {
-                                delay: 0.55 + t.cm * 0.02,
-                                duration: 0.2
+                                delay: 0.62 + t.cm * 0.03,
+                                duration: 0.16
                             },
                             children: [
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("line", {
@@ -560,11 +631,11 @@ function TapeMeasure({ maxCm }) {
                                     strokeWidth: t.major ? 1.2 : 1
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/hero/tape/TapeMeasure.tsx",
-                                    lineNumber: 75,
+                                    lineNumber: 80,
                                     columnNumber: 13
                                 }, this),
                                 t.major && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("text", {
-                                    x: t.x - (t.cm >= 10 ? 0 : 0),
+                                    x: t.x,
                                     y: TAPE_Y + 9.5,
                                     fontSize: 7.5,
                                     textAnchor: "middle",
@@ -574,19 +645,19 @@ function TapeMeasure({ maxCm }) {
                                     children: t.cm
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/hero/tape/TapeMeasure.tsx",
-                                    lineNumber: 85,
+                                    lineNumber: 90,
                                     columnNumber: 15
                                 }, this)
                             ]
                         }, t.cm, true, {
                             fileName: "[project]/src/components/hero/tape/TapeMeasure.tsx",
-                            lineNumber: 69,
+                            lineNumber: 74,
                             columnNumber: 11
                         }, this))
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/hero/tape/TapeMeasure.tsx",
-                lineNumber: 33,
+                lineNumber: 41,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$framer$2d$motion$2f$dist$2f$es$2f$render$2f$components$2f$motion$2f$proxy$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["motion"].g, {
@@ -594,10 +665,10 @@ function TapeMeasure({ maxCm }) {
                     opacity: 0
                 },
                 animate: {
-                    opacity: 1
+                    opacity: mounted ? 1 : 0
                 },
                 transition: {
-                    delay: 0.3,
+                    delay: 0.32,
                     duration: 0.3
                 },
                 children: [
@@ -613,7 +684,7 @@ function TapeMeasure({ maxCm }) {
                         strokeWidth: 1.5
                     }, void 0, false, {
                         fileName: "[project]/src/components/hero/tape/TapeMeasure.tsx",
-                        lineNumber: 107,
+                        lineNumber: 112,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("circle", {
@@ -626,7 +697,7 @@ function TapeMeasure({ maxCm }) {
                         strokeWidth: 1.5
                     }, void 0, false, {
                         fileName: "[project]/src/components/hero/tape/TapeMeasure.tsx",
-                        lineNumber: 118,
+                        lineNumber: 123,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("circle", {
@@ -637,7 +708,7 @@ function TapeMeasure({ maxCm }) {
                         fillOpacity: 0.5
                     }, void 0, false, {
                         fileName: "[project]/src/components/hero/tape/TapeMeasure.tsx",
-                        lineNumber: 127,
+                        lineNumber: 132,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("rect", {
@@ -649,18 +720,19 @@ function TapeMeasure({ maxCm }) {
                         fillOpacity: 0.25
                     }, void 0, false, {
                         fileName: "[project]/src/components/hero/tape/TapeMeasure.tsx",
-                        lineNumber: 128,
+                        lineNumber: 133,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/hero/tape/TapeMeasure.tsx",
-                lineNumber: 102,
+                lineNumber: 107,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true);
 }
+_s(TapeMeasure, "LrrVfNW3d1raFE0BNzCTILYmIfo=");
 _c = TapeMeasure;
 var _c;
 __turbopack_context__.k.register(_c, "TapeMeasure");
@@ -917,7 +989,7 @@ function MeasurementValue({ display, anchorLabel, verdict, kind, pulse, converti
         style: {
             y: yShift
         },
-        className: "pointer-events-none absolute top-10 right-0 z-0 text-right md:top-14",
+        className: "pointer-events-none absolute top-10 right-36 z-0 text-right md:top-14 md:right-0",
         children: [
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
                 className: "font-mono text-[9px] tracking-[0.3em] text-fog",
@@ -1068,10 +1140,10 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$format$2e$ts__
 ;
 function BrandSelector({ brands, active, onSelect }) {
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-        className: "pointer-events-auto z-20",
+        className: "pointer-events-auto z-20 flex flex-col items-end",
         children: [
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                className: "mb-2 text-right font-mono text-[9px] tracking-[0.3em] text-fog",
+                className: "mb-2 pr-0.5 font-mono text-[9px] tracking-[0.3em] text-fog",
                 children: "BRAND — SIZE LABEL"
             }, void 0, false, {
                 fileName: "[project]/src/components/hero/tape/BrandSelector.tsx",
@@ -1079,10 +1151,10 @@ function BrandSelector({ brands, active, onSelect }) {
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                className: "flex flex-wrap justify-end gap-1.5",
+                className: "flex flex-col items-stretch gap-1.5",
                 children: brands.map((b)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                         onClick: ()=>onSelect(b.slug),
-                        className: (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$format$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["cn"])("border px-3 py-2 font-mono text-[10px] tracking-[0.18em] uppercase transition-colors duration-200", active === b.slug ? "border-signal bg-signal text-bone" : "border-bone/25 text-fog hover:border-bone/50 hover:text-bone"),
+                        className: (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$format$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["cn"])("w-32 border px-3 py-2 text-right font-mono text-[10px] tracking-[0.18em] uppercase transition-colors duration-200", active === b.slug ? "border-signal bg-signal text-bone" : "border-bone/25 bg-ink/85 text-fog hover:border-bone/50 hover:text-bone"),
                         children: b.name
                     }, b.slug, false, {
                         fileName: "[project]/src/components/hero/tape/BrandSelector.tsx",
@@ -1467,35 +1539,41 @@ function TapeHero({ brands, config = FOOT_CONFIG }) {
                 lineNumber: 270,
                 columnNumber: 7
             }, this),
-            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$framer$2d$motion$2f$dist$2f$es$2f$render$2f$components$2f$motion$2f$proxy$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["motion"].div, {
-                initial: {
-                    opacity: 0,
-                    y: 12
-                },
-                animate: {
-                    opacity: 1,
-                    y: 0
-                },
-                transition: {
-                    delay: 1.35,
-                    duration: 0.4
-                },
-                className: "absolute right-0 bottom-2 left-0 md:left-auto",
-                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$hero$2f$tape$2f$BrandSelector$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
-                    brands: brands,
-                    active: brand,
-                    onSelect: (s)=>{
-                        setBrand(s);
-                        runConvert(committed, s, true);
-                    }
+            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                className: "absolute top-1/2 right-0 z-20 -translate-y-1/2 md:right-3",
+                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$framer$2d$motion$2f$dist$2f$es$2f$render$2f$components$2f$motion$2f$proxy$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["motion"].div, {
+                    initial: {
+                        opacity: 0,
+                        x: 14
+                    },
+                    animate: {
+                        opacity: 1,
+                        x: 0
+                    },
+                    transition: {
+                        delay: 1.35,
+                        duration: 0.4
+                    },
+                    children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$hero$2f$tape$2f$BrandSelector$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
+                        brands: brands,
+                        active: brand,
+                        onSelect: (s)=>{
+                            setBrand(s);
+                            runConvert(committed, s, true);
+                        }
+                    }, void 0, false, {
+                        fileName: "[project]/src/components/hero/TapeHero.tsx",
+                        lineNumber: 284,
+                        columnNumber: 11
+                    }, this)
                 }, void 0, false, {
                     fileName: "[project]/src/components/hero/TapeHero.tsx",
-                    lineNumber: 283,
+                    lineNumber: 279,
                     columnNumber: 9
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/src/components/hero/TapeHero.tsx",
-                lineNumber: 277,
+                lineNumber: 278,
                 columnNumber: 7
             }, this)
         ]

@@ -457,6 +457,10 @@
     right: calc(var(--spacing) * 16);
   }
 
+  .right-36 {
+    right: calc(var(--spacing) * 36);
+  }
+
   .-bottom-3 {
     bottom: calc(var(--spacing) * -3);
   }
@@ -467,10 +471,6 @@
 
   .bottom-0 {
     bottom: calc(var(--spacing) * 0);
-  }
-
-  .bottom-2 {
-    bottom: calc(var(--spacing) * 2);
   }
 
   .bottom-16 {
@@ -761,6 +761,10 @@
     width: calc(var(--spacing) * 16);
   }
 
+  .w-32 {
+    width: calc(var(--spacing) * 32);
+  }
+
   .w-full {
     width: 100%;
   }
@@ -910,6 +914,10 @@
     align-items: flex-start;
   }
 
+  .items-stretch {
+    align-items: stretch;
+  }
+
   .justify-between {
     justify-content: space-between;
   }
@@ -1002,6 +1010,10 @@
 
   .overflow-y-auto {
     overflow-y: auto;
+  }
+
+  .rounded {
+    border-radius: .25rem;
   }
 
   .border {
@@ -1407,6 +1419,10 @@
     padding-top: calc(var(--spacing) * 16);
   }
 
+  .pr-0\.5 {
+    padding-right: calc(var(--spacing) * .5);
+  }
+
   .pr-1 {
     padding-right: calc(var(--spacing) * 1);
   }
@@ -1542,6 +1558,10 @@
     font-size: clamp(3.2rem, 8vw, 5.5rem);
   }
 
+  .text-\[clamp\(3\.4rem\,12\.5vw\,10rem\)\] {
+    font-size: clamp(3.4rem, 12.5vw, 10rem);
+  }
+
   .text-\[clamp\(3\.6rem\,10vw\,9rem\)\] {
     font-size: clamp(3.6rem, 10vw, 9rem);
   }
@@ -1556,10 +1576,6 @@
 
   .text-\[clamp\(4\.5rem\,11vw\,10rem\)\] {
     font-size: clamp(4.5rem, 11vw, 10rem);
-  }
-
-  .text-\[clamp\(4rem\,14vw\,11rem\)\] {
-    font-size: clamp(4rem, 14vw, 11rem);
   }
 
   .text-\[clamp\(5rem\,20vw\,14rem\)\] {
@@ -2201,6 +2217,18 @@
   }
 
   @media (min-width: 48rem) {
+    .md\:right-0 {
+      right: calc(var(--spacing) * 0);
+    }
+  }
+
+  @media (min-width: 48rem) {
+    .md\:right-3 {
+      right: calc(var(--spacing) * 3);
+    }
+  }
+
+  @media (min-width: 48rem) {
     .md\:right-8 {
       right: calc(var(--spacing) * 8);
     }
@@ -2215,12 +2243,6 @@
   @media (min-width: 48rem) {
     .md\:left-\[36\%\] {
       left: 36%;
-    }
-  }
-
-  @media (min-width: 48rem) {
-    .md\:left-auto {
-      left: auto;
     }
   }
 

@@ -257,7 +257,7 @@ function Nav() {
                     children: [
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$rsc$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                             className: "font-display text-xl tracking-wide text-bone",
-                            children: "SIZEHUB"
+                            children: "FIT CHECK"
                         }, void 0, false, {
                             fileName: "[project]/src/components/Nav.tsx",
                             lineNumber: 10,
@@ -392,8 +392,8 @@ function Footer() {
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$rsc$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                             children: [
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$rsc$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                    className: "font-display text-[clamp(4rem,14vw,11rem)] leading-[0.85] tracking-tight text-stroke select-none",
-                                    children: "SIZEHUB"
+                                    className: "font-display text-[clamp(3.4rem,12.5vw,10rem)] leading-[0.85] tracking-tight text-stroke select-none whitespace-nowrap",
+                                    children: "FIT CHECK"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/Footer.tsx",
                                     lineNumber: 10,
@@ -543,7 +543,7 @@ function Footer() {
                     className: "mt-14 flex flex-col gap-2 border-t border-bone/10 pt-6 font-mono text-[10px] tracking-[0.2em] text-fog md:flex-row md:items-center md:justify-between",
                     children: [
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$rsc$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                            children: "SIZING HUB — 2026"
+                            children: "FIT CHECK — 2026"
                         }, void 0, false, {
                             fileName: "[project]/src/components/Footer.tsx",
                             lineNumber: 58,
@@ -607,8 +607,8 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$Footer$
 ;
 const metadata = {
     title: {
-        default: "SIZEHUB — Know Your Size In Every Brand",
-        template: "%s — SIZEHUB"
+        default: "FIT CHECK — Know Your Size In Every Brand",
+        template: "%s — FIT CHECK"
     },
     description: "Cross-brand size conversion for India. Anchor once on your foot, chest or waist measurement — convert into Nike, Adidas, Levi's, Zara and 20+ more brands instantly."
 };
