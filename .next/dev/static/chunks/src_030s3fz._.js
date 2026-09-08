@@ -989,7 +989,7 @@ function MeasurementValue({ display, anchorLabel, verdict, kind, pulse, converti
         style: {
             y: yShift
         },
-        className: "pointer-events-none absolute top-10 right-36 z-0 text-right md:top-14 md:right-0",
+        className: "pointer-events-none absolute top-6 right-0 z-0 text-right md:top-14",
         children: [
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
                 className: "font-mono text-[9px] tracking-[0.3em] text-fog",
@@ -1143,7 +1143,7 @@ function BrandSelector({ brands, active, onSelect }) {
         className: "pointer-events-auto z-20 flex flex-col items-end",
         children: [
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                className: "mb-2 pr-0.5 font-mono text-[9px] tracking-[0.3em] text-fog",
+                className: "mb-2 hidden pr-0.5 font-mono text-[9px] tracking-[0.3em] text-fog md:block",
                 children: "BRAND — SIZE LABEL"
             }, void 0, false, {
                 fileName: "[project]/src/components/hero/tape/BrandSelector.tsx",
@@ -1151,10 +1151,10 @@ function BrandSelector({ brands, active, onSelect }) {
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                className: "flex flex-col items-stretch gap-1.5",
+                className: "flex flex-row flex-wrap justify-end gap-1.5 md:flex-col md:items-stretch",
                 children: brands.map((b)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                         onClick: ()=>onSelect(b.slug),
-                        className: (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$format$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["cn"])("w-32 border px-3 py-2 text-right font-mono text-[10px] tracking-[0.18em] uppercase transition-colors duration-200", active === b.slug ? "border-signal bg-signal text-bone" : "border-bone/25 bg-ink/85 text-fog hover:border-bone/50 hover:text-bone"),
+                        className: (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$format$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["cn"])("border px-3 py-2.5 text-right font-mono text-[10px] tracking-[0.18em] uppercase transition-colors duration-200 md:w-32 md:py-2", active === b.slug ? "border-signal bg-signal text-bone" : "border-bone/25 bg-ink/85 text-fog hover:border-bone/50 hover:text-bone"),
                         children: b.name
                     }, b.slug, false, {
                         fileName: "[project]/src/components/hero/tape/BrandSelector.tsx",
@@ -1468,7 +1468,7 @@ function TapeHero({ brands, config = FOOT_CONFIG }) {
                 children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("svg", {
                     ref: svgRef,
                     viewBox: "0 0 640 600",
-                    className: "h-full w-full select-none opacity-60 md:opacity-100",
+                    className: "h-full w-full select-none",
                     preserveAspectRatio: "xMidYMid meet",
                     children: [
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$hero$2f$tape$2f$TapeMeasure$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
@@ -1540,7 +1540,7 @@ function TapeHero({ brands, config = FOOT_CONFIG }) {
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                className: "absolute top-1/2 right-0 z-20 -translate-y-1/2 md:right-3",
+                className: "absolute right-0 bottom-0 left-0 z-20 md:top-1/2 md:right-3 md:bottom-auto md:left-auto md:-translate-y-1/2",
                 children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$framer$2d$motion$2f$dist$2f$es$2f$render$2f$components$2f$motion$2f$proxy$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["motion"].div, {
                     initial: {
                         opacity: 0,

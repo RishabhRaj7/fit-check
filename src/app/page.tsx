@@ -64,11 +64,8 @@ export default async function Home() {
         <div className="pointer-events-none absolute top-1/2 left-2 hidden -translate-y-1/2 -rotate-90 font-mono text-[10px] tracking-[0.5em] text-fog xl:block">
           26.5 CM — THE ONLY NUMBER THAT MATTERS
         </div>
-        <div className="absolute inset-0 md:left-[36%]">
-          <TapeHero brands={heroBrands} />
-        </div>
 
-        <div className="pointer-events-none relative z-10 mx-auto flex min-h-[92svh] max-w-[1600px] flex-col justify-center px-4 py-24 md:px-8">
+        <div className="pointer-events-none relative z-10 mx-auto flex min-h-0 max-w-[1600px] flex-col justify-center px-4 py-12 md:min-h-[92svh] md:px-8 md:py-24">
           <div className="max-w-3xl">
             <p className="flex items-center gap-2 font-mono text-[10px] tracking-[0.3em] text-bone/80">
               <span className="inline-block h-2 w-2 bg-signal" />
@@ -89,7 +86,7 @@ export default async function Home() {
             </h1>
             <FadeUp delay={0.35} className="mt-6 max-w-md">
               <p className="text-sm leading-relaxed text-bone/70 md:text-base">
-                Nike says UK 8. Bata says UK 7. We say stop guessing. Anchor
+                Adidas says UK 8. Nike says UK 7. We say stop guessing. Anchor
                 your body once — convert into{" "}
                 <span className="text-bone">{stats.brands} brands</span>{" "}
                 instantly, down to the exact chart row.
@@ -133,6 +130,9 @@ export default async function Home() {
               ))}
             </div>
           </FadeUp>
+        </div>
+        <div className="relative mt-10 h-[430px] w-full md:absolute md:inset-0 md:mt-0 md:h-auto md:w-auto md:left-[36%]">
+          <TapeHero brands={heroBrands} />
         </div>
       </section>
 

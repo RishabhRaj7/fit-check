@@ -27,7 +27,7 @@ export default function MeasurementValue({
   return (
     <motion.div
       style={{ y: yShift }}
-      className="pointer-events-none absolute top-10 right-36 z-0 text-right md:top-14 md:right-0"
+      className="pointer-events-none absolute top-6 right-0 z-0 text-right md:top-14"
     >
       <p className="font-mono text-[9px] tracking-[0.3em] text-fog">
         {anchorLabel} — REFERENCE · DRAG TO RE-MEASURE

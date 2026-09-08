@@ -245,7 +245,7 @@ export default function TapeHero({
         <svg
           ref={svgRef}
           viewBox="0 0 640 600"
-          className="h-full w-full select-none opacity-60 md:opacity-100"
+          className="h-full w-full select-none"
           preserveAspectRatio="xMidYMid meet"
         >
           {/* tape first (under everything) */}
@@ -274,8 +274,8 @@ export default function TapeHero({
         DRAG THE TANG — SNAPS EVERY 0.5 CM
       </motion.p>
 
-      {/* vertical brand rail — right edge, centered on the ruler line */}
-      <div className="absolute top-1/2 right-0 z-20 -translate-y-1/2 md:right-3">
+       {/* brand rail: bottom row on mobile, vertical at the right edge on md+ */}
+      <div className="absolute right-0 bottom-0 left-0 z-20 md:top-1/2 md:right-3 md:bottom-auto md:left-auto md:-translate-y-1/2">
         <motion.div
           initial={{ opacity: 0, x: 14 }}
           animate={{ opacity: 1, x: 0 }}
