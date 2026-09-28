@@ -21,6 +21,7 @@ import {
   LogOut,
   Package,
   Plus,
+  RefreshCw,
   Table2,
   Trash2,
   TriangleAlert,
@@ -268,7 +269,7 @@ export default function AdminApp({
   const [fsReady, setFsReady] = useState<boolean | null>(null);
   const [user, setUser] = useState<User | null>(null);
 
-  const [tab, setTab] = useState<"brands" | "charts" | "products">("brands");
+  const [tab, setTab] = useState<"brands" | "charts" | "products" | "sync">("brands");
   const [brands, setBrands] = useState(initialBrands);
   const [charts, setCharts] = useState(initialCharts);
   const [products, setProducts] = useState(initialProducts);
@@ -430,6 +431,7 @@ export default function AdminApp({
               ["brands", "BRANDS", Database],
               ["charts", "CHARTS", Table2],
               ["products", "PRODUCTS", Package],
+              ["sync", "SYNC CATALOGUE", RefreshCw],
             ] as [typeof tab, string, typeof Database][]
           ).map(([t, label, Icon]) => (
             <button
@@ -472,7 +474,109 @@ export default function AdminApp({
             ops={ops}
           />
         )}
+        {tab === "sync" && <SyncTab />}
       </div>
+    </div>
+  );
+}
+
+/* ================================================================== sync */
+
+type Plan = Awaited<ReturnType<typeof import("@/db/seedPlan").planSeed>>;
+
+/** Writes the researched catalogue (src/db/catalog) as the signed-in admin. */
+function SyncTab() {
+  const [plan, setPlan] = useState<Plan | null>(null);
+  const [state, setState] = useState<"idle" | "planning" | "ready" | "writing" | "done">("idle");
+  const [err, setErr] = useState("");
+
+  const preview = async () => {
+    setErr("");
+    setState("planning");
+    try {
+      const { planSeed } = await import("@/db/seedPlan");
+      setPlan(await planSeed(clientFs()!));
+      setState("ready");
+    } catch (e) {
+      setErr(errMsg(e));
+      setState("idle");
+    }
+  };
+
+  const apply = async () => {
+    if (!plan) return;
+    setErr("");
+    setState("writing");
+    try {
+      await plan.commit();
+      setState("done");
+    } catch (e) {
+      setErr(errMsg(e));
+      setState("ready");
+    }
+  };
+
+  const busy = state === "planning" || state === "writing";
+
+  return (
+    <div className="max-w-2xl border border-bone/12 bg-coal p-6 md:p-8">
+      <p className="kicker text-fog">Researched catalogue → Firestore</p>
+      <p className="mt-4 text-sm leading-relaxed text-fog">
+        Upserts every brand, researched chart and starter product bundled with
+        this build. Charts saved here in the deck are never overwritten; charts
+        from earlier seeds that are no longer in the catalogue are removed.
+        Safe to run again after each deploy.
+      </p>
+
+      {plan && (
+        <dl className="mt-6 grid grid-cols-2 border-t border-l border-bone/12 font-mono text-xs md:grid-cols-4">
+          {(
+            [
+              ["Brands", plan.brands],
+              ["Charts", plan.charts],
+              ["Stale charts", plan.staleCharts],
+              ["Writes", plan.writes],
+            ] as const
+          ).map(([k, v]) => (
+            <div key={k} className="border-r border-b border-bone/12 p-3">
+              <dt className="text-[9px] tracking-[0.16em] text-fog uppercase">{k}</dt>
+              <dd className="mt-1 text-lg text-bone">{v}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {plan && plan.log.length > 0 && state !== "done" && (
+        <pre className="mt-4 max-h-48 overflow-auto border border-bone/12 bg-ink p-3 font-mono text-[10px] leading-relaxed text-fog">
+          {plan.log.join("\n")}
+        </pre>
+      )}
+
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        {state !== "done" && (
+          <button
+            onClick={() => void (state === "ready" ? apply() : preview())}
+            disabled={busy}
+            className="kicker flex items-center gap-2 bg-signal px-4 py-3 text-bone transition-colors hover:bg-bone hover:text-ink disabled:opacity-50"
+          >
+            {busy ? <Loader2 size={13} className="animate-spin" /> : state === "ready" ? <Upload size={13} /> : <RefreshCw size={13} />}
+            {state === "ready" ? `Write ${plan?.writes ?? ""} changes` : "Preview sync"}
+          </button>
+        )}
+        {state === "done" && (
+          <>
+            <span className="flex items-center gap-2 font-mono text-xs text-frost">
+              <Check size={14} /> Catalogue synced. The public site picks it up within a minute.
+            </span>
+            <button
+              onClick={() => window.location.reload()}
+              className="kicker border border-bone/20 px-4 py-3 text-fog transition-colors hover:text-bone"
+            >
+              Reload deck
+            </button>
+          </>
+        )}
+      </div>
+      {err && <p className="mt-3 font-mono text-xs text-frost">{err}</p>}
     </div>
   );
 }

@@ -37,10 +37,9 @@ that minute; `/admin` itself always reads live.
 
 ## 2. Auth providers
 
-**Build → Authentication → Sign-in method**, enable:
-
-- **Google** — visitor profiles and `/admin`.
-- **Email/Password** — only for the seed script (Node can't open a popup).
+**Build → Authentication → Sign-in method**, enable **Google** only — it's
+used for visitor profiles and `/admin`. Email/Password isn't needed; leave it
+off.
 
 Add your production domain under **Authentication → Settings → Authorized
 domains**, or Google sign-in will fail there.
@@ -51,22 +50,15 @@ Project settings → **Your apps** → **Web** (`</>`) → register → copy the
 values into `.env.local` (see `.env.example`) and your host's environment
 variables.
 
-## 4. Admin UIDs → rules → deploy
+## 4. Admin UID → rules → deploy
 
-There are two admin sign-ins, and Firebase treats them as **two different
-users with two different UIDs** (even with the same email):
-
-| Used by            | Sign-in method  | UID found |
-| ------------------ | --------------- | --------- |
-| `/admin` in the browser | Google     | Authentication → Users, after you sign in once on /admin |
-| `npm run seed`     | Email/password  | printed by the seed when it signs in |
-
-Put both in `isAdmin()` in `firestore.rules`:
+Sign in once on `/admin` with your Google account, copy its UID from
+**Authentication → Users**, and put it in `isAdmin()` in `firestore.rules`
+(it's a list, so more admins can be added later):
 
 ```
 request.auth.uid in [
-  "GOOGLE_ACCOUNT_UID",
-  "SEED_ACCOUNT_UID"
+  "YOUR_GOOGLE_ACCOUNT_UID"
 ]
 ```
 
@@ -76,21 +68,15 @@ Then deploy:
 firebase deploy --only firestore
 ```
 
-Tip: use a separate email for the seed account (e.g. a `+seed` alias). If you
-reuse your Google email, Firebase won't create a password for it — add one via
-Authentication → Users → ⋮ → Reset password instead.
+## 5. Load the catalogue
 
-## 5. Seed the catalogue (once)
+`/admin` → **Sync catalogue** → **Preview sync** → **Write N changes**. It
+writes as your Google admin account and upserts the researched brands, charts
+and starter products bundled with the build. Brands and charts edited in
+`/admin` are kept. Run it again whenever a deploy adds catalogue data.
 
-```bash
-npm run seed -- --dry    # preview, no sign-in needed
-npm run seed             # ADMIN_EMAIL + ADMIN_PASSWORD from .env.local
-```
-
-Creates the email/password account on first run, signs in, prints its UID
-and upserts the catalogue (brands, researched charts, starter products).
-Brands and charts edited in `/admin` are kept. If Firestore refuses the
-writes, the seed prints the UID to add to the rules.
+`npm run seed` prints the same preview from the command line without writing
+anything.
 
 ## 6. Verify
 
@@ -106,7 +92,7 @@ Signed out, a visitor's sizes live in `localStorage` on that device. On
 sign-in they're merged into `users/{uid}` (newer entry wins) and the device
 copy is cleared, so the next person on a shared device starts clean. The
 rules only let a user write `sizeProfile` and `updatedAt` to their own
-document, with at most 16 entries.
+document, with at most 40 entries.
 
 ## Troubleshooting
 

@@ -17,8 +17,7 @@ service cloud.firestore {
     function isAdmin() {
       return request.auth != null
         && request.auth.uid in [
-          "UBcMuGNyIMVLOJ0f9fHY2qrc75v1"  // Google account used on /admin
-          // , "PASTE_SEED_ACCOUNT_UID"    // email/password account used by `npm run seed`
+          "UBcMuGNyIMVLOJ0f9fHY2qrc75v1"  // admin Google account (/admin)
         ];
     }
 

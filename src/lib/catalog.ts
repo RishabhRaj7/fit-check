@@ -91,7 +91,7 @@ function toRow(r: Record<string, unknown>): SizeRow {
 
 /**
  * CATALOG_SOURCE=local builds the catalogue from the seed files instead of
- * Firestore — for previewing data changes before running `npm run seed`.
+ * Firestore — for previewing data changes before syncing it from /admin.
  */
 async function loadLocal(): Promise<Catalog> {
   const [{ CATALOG }, { PRODUCTS }, { chartDocId }] = await Promise.all([
