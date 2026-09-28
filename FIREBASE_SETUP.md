@@ -51,34 +51,46 @@ Project settings → **Your apps** → **Web** (`</>`) → register → copy the
 values into `.env.local` (see `.env.example`) and your host's environment
 variables.
 
-## 4. Admin UID → rules → deploy
+## 4. Admin UIDs → rules → deploy
 
-Sign in once with the account you'll use as admin (on `/admin`, or via the
-seed script), copy its UID from **Authentication → Users**, and put it in
-`firestore.rules`:
+There are two admin sign-ins, and Firebase treats them as **two different
+users with two different UIDs** (even with the same email):
+
+| Used by            | Sign-in method  | UID found |
+| ------------------ | --------------- | --------- |
+| `/admin` in the browser | Google     | Authentication → Users, after you sign in once on /admin |
+| `npm run seed`     | Email/password  | printed by the seed when it signs in |
+
+Put both in `isAdmin()` in `firestore.rules`:
 
 ```
-request.auth.uid == "YOUR_UID";
+request.auth.uid in [
+  "GOOGLE_ACCOUNT_UID",
+  "SEED_ACCOUNT_UID"
+]
 ```
 
-Then deploy rules (and the empty index file):
+Then deploy:
 
 ```bash
-npm i -g firebase-tools
-firebase login
 firebase deploy --only firestore
 ```
+
+Tip: use a separate email for the seed account (e.g. a `+seed` alias). If you
+reuse your Google email, Firebase won't create a password for it — add one via
+Authentication → Users → ⋮ → Reset password instead.
 
 ## 5. Seed the catalogue (once)
 
 ```bash
-ADMIN_EMAIL=you@example.com ADMIN_PASSWORD='a-strong-password' npm run seed
+npm run seed -- --dry    # preview, no sign-in needed
+npm run seed             # ADMIN_EMAIL + ADMIN_PASSWORD from .env.local
 ```
 
-Creates the email/password account on first run, then signs in and writes
-20 brands, 69 charts, 608 rows and the starter products. Re-running clears and
-rewrites. The starter charts are generated from standard conversion steps —
-replace them with each brand's published chart in `/admin` over time.
+Creates the email/password account on first run, signs in, prints its UID
+and upserts the catalogue (brands, researched charts, starter products).
+Brands and charts edited in `/admin` are kept. If Firestore refuses the
+writes, the seed prints the UID to add to the rules.
 
 ## 6. Verify
 

@@ -44,6 +44,7 @@ async function main() {
   const { getFirestore, collection, doc, getDocs, writeBatch } = await import("firebase/firestore");
 
   const app = initializeApp(cfg);
+  let seedUid = "";
   const fs = getFirestore(app);
 
   if (!DRY) {
@@ -56,10 +57,26 @@ async function main() {
     console.log(`Signing in as ${email}…`);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-    } catch {
-      console.log("Account not found — creating it…");
-      await createUserWithEmailAndPassword(auth, email, password);
+    } catch (e) {
+      const code = (e as { code?: string }).code ?? "";
+      if (code !== "auth/user-not-found" && code !== "auth/invalid-credential") throw e;
+      try {
+        console.log("No email/password account yet — creating it…");
+        await createUserWithEmailAndPassword(auth, email, password);
+      } catch (e2) {
+        if ((e2 as { code?: string }).code === "auth/email-already-in-use") {
+          throw new Error(
+            `${email} already exists in Firebase Auth but this password didn't work — either the password is wrong, ` +
+              "or it's a Google-only account with no password. Either use a different ADMIN_EMAIL for " +
+              "the seed, or add a password to that account: Authentication → Users → ⋮ → Reset password, " +
+              "follow the email, then re-run with that password."
+          );
+        }
+        throw e2;
+      }
     }
+    seedUid = auth.currentUser?.uid ?? "";
+    console.log(`Signed in. Seed account UID: ${seedUid}`);
   }
 
   const [brandSnap, chartSnap, productSnap] = await Promise.all([
@@ -162,10 +179,24 @@ async function main() {
     console.log("Dry run — nothing written.");
     return;
   }
-  for (let i = 0; i < ops.length; i += 450) {
-    const batch = writeBatch(fs);
-    ops.slice(i, i + 450).forEach((op) => op(batch));
-    await batch.commit();
+  try {
+    for (let i = 0; i < ops.length; i += 450) {
+      const batch = writeBatch(fs);
+      ops.slice(i, i + 450).forEach((op) => op(batch));
+      await batch.commit();
+    }
+  } catch (e) {
+    if (String((e as { code?: string }).code ?? "").includes("permission-denied")) {
+      throw new Error(
+        `Firestore refused the writes. Add this UID to isAdmin() in firestore.rules:
+
+    "${seedUid}"
+
+` +
+          "then run `firebase deploy --only firestore:rules` and re-run the seed."
+      );
+    }
+    throw e;
   }
   console.log("Done.");
 }
