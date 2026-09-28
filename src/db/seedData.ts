@@ -1,4 +1,5 @@
-/* Pure seed data — shared by the Postgres and Firestore seed writers. */
+/* Starter catalogue for src/db/seed.ts. Charts are generated from standard
+   conversion steps — replace them with each brand's published chart in /admin. */
 /* ---------------------------------------------------------------- helpers */
 
 const fmt = (n: number): string => {
@@ -379,12 +380,5 @@ const PRODUCTS: ProductSeed[] = [
   { brand: "us-polo-assn", category: "tshirt", name: "Iconic Logo Tee", price: 1499 },
   { brand: "us-polo-assn", category: "sneakers", name: "Court Classic Sneaker", price: 2799 },
 ];
-function slugifyProduct(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
-export { BRANDS, PRODUCTS, slugifyProduct };
+export { BRANDS, PRODUCTS };
 export type { RowSeed, ChartSeed, BrandSeed, ProductSeed };

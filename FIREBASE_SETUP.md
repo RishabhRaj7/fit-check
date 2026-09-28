@@ -1,131 +1,106 @@
-# Fit Check — Firebase Setup (web-app config)
+# Fit Check — Firebase setup
 
-The app now uses the **public Firebase web-app config** — the six keys you
-get from *Project settings → Your apps → Web app*. No service account, no
-private key to copy.
+Fit Check runs entirely on the **public Firebase web-app config** — the six
+keys from *Project settings → Your apps → Web app*. There is no service
+account and no private key.
 
-How access is split:
+| Who                | Reads                          | Writes                                    |
+| ------------------ | ------------------------------ | ----------------------------------------- |
+| Next.js server     | brands, charts, products       | —                                         |
+| Signed-in visitor  | their own `users/{uid}`        | their own `users/{uid}` (size profile)    |
+| Admin (`/admin`)   | everything public              | brands, charts, products                  |
 
-- **Reads** (every page, the converter, the hero): the public config,
-  server-side in Next and via `/api/*`. Open reads, enforced by rules.
-- **Writes** (`/admin`, seed): an **authenticated account whose email is
-  hardcoded in `firestore.rules`** — Google sign-in in `/admin`, or
-  email/password in the seed script.
+## Data model
+
+```
+brands/{slug}                        { name, slug, categories[], priority, needsData, logoUrl? }
+charts/{slug}__{category}__{gender}  { brandSlug, brandName, category, gender, needsData,
+                                       updatedAt, updatedBy, rows: [{ anchorValue, eu, uk, us, jpn, ind, label }] }
+products/{autoId}                    { brandSlug, category, name, priceInr }
+users/{uid}                          { sizeProfile: { "{category}:{gender}": entry }, updatedAt }
+```
+
+The public catalogue (~100 small documents) is read **once per minute per
+server instance** into memory (`src/lib/catalog.ts`) and every page, the
+converter and `/api/convert` work from that snapshot. Size conversion runs in
+the browser (`src/lib/sizing.ts`), so dragging a slider never touches the
+network. Admin edits go straight to Firestore and reach the public site within
+that minute; `/admin` itself always reads live.
 
 ---
 
-## 1. Create the project & database (Firebase console)
+## 1. Project & database
 
-1. <https://console.firebase.google.com> → **Add project** (e.g. `fit-check`).
-   Analytics optional.
-2. Project settings → **Usage and billing** → link a billing account
-   (required to activate Firestore; free Spark allowances apply).
-3. **Build → Firestore Database → Create database**
-   - Location: `asia-south1 (Mumbai)`
-   - Mode: **Production**
+1. <https://console.firebase.google.com> → **Add project**.
+2. **Build → Firestore Database → Create database** — `asia-south1 (Mumbai)`,
+   **Production** mode.
 
-## 2. Enable the two auth providers
+## 2. Auth providers
 
-**Build → Authentication → Get started → Sign-in method**, enable:
+**Build → Authentication → Sign-in method**, enable:
 
-- **Google** — for `/admin` sign-in.
-- **Email/Password** — for the seed script (Node can't do a Google popup).
+- **Google** — visitor profiles and `/admin`.
+- **Email/Password** — only for the seed script (Node can't open a popup).
 
-## 3. Register a web app & copy the config
+Add your production domain under **Authentication → Settings → Authorized
+domains**, or Google sign-in will fail there.
 
-Project settings → **Your apps** → **Web** (`</>`) → register (any nickname).
-Copy the `firebaseConfig` object into your env, keeping these exact names
-(see `.env.example`):
+## 3. Web config
 
-```bash
-FIREBASE_API_KEY=AIza…
-FIREBASE_AUTH_DOMAIN=fit-check.firebaseapp.com
-FIREBASE_PROJECT_ID=fit-check
-FIREBASE_STORAGE_BUCKET=fit-check.appspot.com
-FIREBASE_MESSAGING_SENDER_ID=123…
-FIREBASE_APP_ID=1:123:web:abc…
-```
+Project settings → **Your apps** → **Web** (`</>`) → register → copy the
+values into `.env.local` (see `.env.example`) and your host's environment
+variables.
 
-Locally: `.env`. On your host (Vercel etc.): platform Environment Variables,
-then redeploy/restart.
+## 4. Admin UID → rules → deploy
 
-## 4. Put YOUR email into the rules, then deploy
-
-Edit `firestore.rules` — replace `owner@example.com` with the Google account
-email you will use as admin (the same email goes in `ADMIN_EMAIL`):
+Sign in once with the account you'll use as admin (on `/admin`, or via the
+seed script), copy its UID from **Authentication → Users**, and put it in
+`firestore.rules`:
 
 ```
-request.auth.token.email == "you@gmail.com";
+request.auth.uid == "YOUR_UID";
 ```
 
-Deploy:
+Then deploy rules (and the empty index file):
 
 ```bash
 npm i -g firebase-tools
 firebase login
-firebase use --add          # pick the project
 firebase deploy --only firestore
 ```
 
-(Also sets the composite indexes from `firestore.indexes.json`.)
-
-## 5. Seed Firestore with the brand data (once)
+## 5. Seed the catalogue (once)
 
 ```bash
-ADMIN_EMAIL=you@gmail.com ADMIN_PASSWORD='a-strong-password' npx tsx src/db/seed.ts
+ADMIN_EMAIL=you@example.com ADMIN_PASSWORD='a-strong-password' npm run seed
 ```
 
-First run **creates** that email/password account in Firebase Auth
-(then you can also use it for email-link-style access if you ever want it);
-later runs just sign in. It writes 20 brands / 69 charts / 608 rows /
-45 products. Re-running is safe (clears and rewrites).
-
-> The `ADMIN_PASSWORD` account is the write credential — pick a real
-> password and keep it private. `/admin` itself uses **Google** sign-in and
-> never sees this password.
+Creates the email/password account on first run, then signs in and writes
+20 brands, 69 charts, 608 rows and the starter products. Re-running clears and
+rewrites. The starter charts are generated from standard conversion steps —
+replace them with each brand's published chart in `/admin` over time.
 
 ## 6. Verify
 
-1. Restart/redeploy the app.
-2. `GET /api/health` → `{"ok":true,"dataSource":"firestore"}`
-   (`postgres` = the six FIREBASE_* vars weren't picked up).
-3. `/admin` → **Sign in with Google** with the rules email → full deck.
-   A different Google account can browse the deck but every write is denied
-   with a clear message.
+- `GET /api/health` → `{"ok":true,"dataSource":"firestore","brands":…}`
+- `/admin` → sign in with the admin Google account → the deck. Any other
+  account can look but every write is denied.
+- `/profile` → sign in with any Google account → save a size → it appears on
+  another device after signing in there.
 
----
+## Size profiles
 
-## 7. User profiles (automatic — nothing to configure)
-
-Visitors who open `/profile` sign in with **Google** (Authentication →
-Google provider, enabled in step 2). Their size profile is stored at
-`users/{uid}` (`sizeProfile` map, same `{category}:{gender}` keys as the
-device profile) and is readable/writable **only by that user** per
-`firestore.rules`. On the next visit — any device — it is fetched back, so
-nothing needs to be re-entered.
-
-Device-only guest entries (IndexedDB) are merged up to Firestore
-automatically on first sign-in. With Firebase not configured, the site keeps
-the old device-only behaviour.
-
-If you edited the rules for your email, redeploy them so the `users/{uid}`
-block ships too:
-
-```bash
-firebase deploy --only firestore
-```
-
----
+Signed out, a visitor's sizes live in `localStorage` on that device. On
+sign-in they're merged into `users/{uid}` (newer entry wins) and the device
+copy is cleared, so the next person on a shared device starts clean. The
+rules only let a user write `sizeProfile` and `updatedAt` to their own
+document, with at most 16 entries.
 
 ## Troubleshooting
 
-- **`dataSource` still `postgres`** — env vars not loaded; check spelling and
-  restart the server.
-- **`permission-denied` on writes** — signed-in email ≠ email in
-  `firestore.rules`, or the rules weren't redeployed after editing.
-- **Seed says "auth/operation-not-allowed"** — the Email/Password provider
-  isn't enabled (step 2).
-- **Seed says "auth/email-already-in-use"** — the account already exists;
-  just make sure `ADMIN_PASSWORD` matches it.
-- **Google popup blocked** — allow popups for the site, or use a regular
-  (non-private) browser window.
+- **`/api/health` returns 503** — the six `FIREBASE_*` vars aren't loaded;
+  check spelling and restart.
+- **`permission-denied` in `/admin`** — the signed-in UID isn't the one in
+  `firestore.rules`, or the rules weren't redeployed.
+- **Seed: `auth/operation-not-allowed`** — enable Email/Password (step 2).
+- **Google popup blocked** — the app falls back to a full-page redirect.

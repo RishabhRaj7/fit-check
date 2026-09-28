@@ -1,84 +1,19 @@
-import "dotenv/config";
-import { BRANDS, PRODUCTS, slugifyProduct } from "./seedData";
+import { config } from "dotenv";
+import { BRANDS, PRODUCTS } from "./seedData";
 
 /**
- * Seed dispatcher.
- *  - With FIREBASE_* web-app config present: seeds Firestore. Because public
- *    config can only READ, the script signs in with email/password first
- *    (ADMIN_EMAIL + ADMIN_PASSWORD env vars — the same email hardcoded in
- *    firestore.rules). The account is created on first run if needed.
- *  - Otherwise: seeds local Postgres (offline fallback).
+ * Seeds Firestore with the starter catalogue.
+ * The public web config can only READ, so the script signs in with
+ * email/password first (ADMIN_EMAIL + ADMIN_PASSWORD) — that account's UID
+ * must be the admin UID in firestore.rules. The account is created on first
+ * run if needed. Re-running is safe: it clears and rewrites.
+ *
+ *   npx tsx src/db/seed.ts
  */
 
-async function seedPostgres() {
-  const { db } = await import("./index");
-  const { brands, products, sizeChartRows, sizeCharts } = await import(
-    "./schema"
-  );
+config({ path: [".env.local", ".env"], quiet: true });
 
-  console.log("Seeding Postgres…");
-  await db.delete(sizeChartRows);
-  await db.delete(sizeCharts);
-  await db.delete(products);
-  await db.delete(brands);
-
-  const idBySlug = new Map<string, number>();
-  let chartCount = 0;
-  let rowCount = 0;
-
-  for (const b of BRANDS) {
-    const [inserted] = await db
-      .insert(brands)
-      .values({
-        name: b.name,
-        slug: b.slug,
-        categories: b.categories,
-        priority: b.priority,
-        needsData: b.needsData ?? false,
-        logoUrl: `/brands/${b.slug}/logo.png`,
-      })
-      .returning({ id: brands.id });
-    idBySlug.set(b.slug, inserted.id);
-
-    for (const c of b.charts) {
-      const [chart] = await db
-        .insert(sizeCharts)
-        .values({
-          brandId: inserted.id,
-          category: c.category,
-          gender: c.gender,
-          updatedBy: "seed",
-        })
-        .returning({ id: sizeCharts.id });
-      chartCount++;
-      if (c.rows.length > 0) {
-        await db
-          .insert(sizeChartRows)
-          .values(c.rows.map((r, i) => ({ ...r, chartId: chart.id, sort: i })));
-        rowCount += c.rows.length;
-      }
-    }
-  }
-
-  for (const p of PRODUCTS) {
-    const brandId = idBySlug.get(p.brand);
-    if (!brandId) continue;
-    await db.insert(products).values({
-      brandId,
-      category: p.category,
-      name: p.name,
-      slug: slugifyProduct(p.name),
-      imageUrl: null,
-      priceInr: p.price,
-    });
-  }
-
-  console.log(
-    `Seeded Postgres: ${BRANDS.length} brands, ${chartCount} charts, ${rowCount} rows, ${PRODUCTS.length} products.`
-  );
-}
-
-async function seedFirestore() {
+async function main() {
   const cfg = {
     apiKey: process.env.FIREBASE_API_KEY ?? "",
     authDomain: process.env.FIREBASE_AUTH_DOMAIN ?? "",
@@ -95,7 +30,7 @@ async function seedFirestore() {
   if (!email || !password) {
     throw new Error(
       "ADMIN_EMAIL and ADMIN_PASSWORD are required to seed Firestore " +
-        "(same email as hardcoded in firestore.rules)"
+        "(the account whose UID is the admin in firestore.rules)"
     );
   }
 
@@ -140,7 +75,6 @@ async function seedFirestore() {
       categories: b.categories,
       priority: b.priority,
       needsData: b.needsData ?? false,
-      logoUrl: `/brands/${b.slug}/logo.png`,
       createdAt: new Date().toISOString(),
     });
 
@@ -165,8 +99,6 @@ async function seedFirestore() {
       brandSlug: p.brand,
       category: p.category,
       name: p.name,
-      slug: slugifyProduct(p.name),
-      imageUrl: null,
       priceInr: p.price,
     });
   }
@@ -174,17 +106,6 @@ async function seedFirestore() {
   console.log(
     `Seeded Firestore: ${BRANDS.length} brands, ${chartCount} charts, ${rowCount} rows, ${PRODUCTS.length} products.`
   );
-  process.exit(0); // close auth listeners
-}
-
-async function main() {
-  const { hasFirebaseConfig } = await import("../lib/firebase/app");
-  if (hasFirebaseConfig()) {
-    await seedFirestore();
-  } else {
-    console.log("No FIREBASE_* config found — falling back to Postgres.");
-    await seedPostgres();
-  }
 }
 
 main()

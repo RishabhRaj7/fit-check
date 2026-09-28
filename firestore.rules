@@ -1,14 +1,13 @@
 rules_version = '2';
 
 // ── Fit Check security rules ────────────────────────────────────────────────
-// • brands / charts / products: public READ (the app reads everywhere with
-//   the public web-app config). WRITE only for the admin — Google sign-in in
-//   /admin, or the seed script's email/password account.
-// • users/{uid}: private per-user size profiles. READ/WRITE only for the
-//   authenticated owner (Firebase Google sign-in on /profile).
+// • brands / charts / products — public catalogue. Anyone can READ; only the
+//   admin account can WRITE (Google sign-in on /admin, or the seed script).
+// • users/{uid} — one private size profile per account. Only its owner can
+//   read or write it, and only in the shape the app writes.
 //
-// ⚠️  REPLACE the admin email below with YOUR Google account email (same as
-//     ADMIN_EMAIL), then: firebase deploy --only firestore
+// The admin is identified by Firebase Auth UID (stable, unlike an email).
+// Find yours under Authentication → Users, then: firebase deploy --only firestore:rules
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -17,23 +16,43 @@ service cloud.firestore {
         && request.auth.uid == "UBcMuGNyIMVLOJ0f9fHY2qrc75v1";
     }
 
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // { sizeProfile: map (≤ 16 anchors), updatedAt: number }
+    function validValues(d) {
+      return (!("sizeProfile" in d) || (d.sizeProfile is map && d.sizeProfile.size() <= 16))
+        && (!("updatedAt" in d) || d.updatedAt is number);
+    }
+
     match /users/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+      allow read, delete: if isOwner(uid);
+      allow create: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(["sizeProfile", "updatedAt"])
+        && validValues(request.resource.data);
+      // Writes may only add/change these two fields; removing anything is
+      // allowed (the app clears fields left behind by older versions).
+      allow update: if isOwner(uid)
+        && request.resource.data.diff(resource.data).addedKeys()
+             .union(request.resource.data.diff(resource.data).changedKeys())
+             .hasOnly(["sizeProfile", "updatedAt"])
+        && validValues(request.resource.data);
     }
 
     match /brands/{brandId} {
       allow read: if true;
-      allow create, update, delete: if isAdmin();
+      allow write: if isAdmin();
     }
 
     match /charts/{chartId} {
       allow read: if true;
-      allow create, update, delete: if isAdmin();
+      allow write: if isAdmin();
     }
 
     match /products/{productId} {
       allow read: if true;
-      allow create, update, delete: if isAdmin();
+      allow write: if isAdmin();
     }
   }
 }

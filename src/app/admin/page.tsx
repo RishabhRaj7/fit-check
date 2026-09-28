@@ -4,20 +4,20 @@ import AdminApp, {
   type AdminChart,
   type AdminProduct,
 } from "@/components/AdminApp";
-import { DS, dataSourceName } from "@/lib/datasource";
+import { getCatalog } from "@/lib/catalog";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = { title: "Admin" };
+export const metadata: Metadata = {
+  title: "Admin",
+  robots: { index: false, follow: false },
+};
 
 export default async function AdminPage() {
-  const [brandRows, chartRows, productRows] = await Promise.all([
-    DS.listBrands(),
-    DS.listCharts(),
-    DS.listProducts(),
-  ]);
+  const cat = await getCatalog({ fresh: true });
+  const nameOf = new Map(cat.brands.map((b) => [b.slug, b.name]));
 
-  const adminBrands: AdminBrand[] = brandRows.map((b) => ({
+  const brands: AdminBrand[] = cat.brands.map((b) => ({
     id: b.slug,
     name: b.name,
     slug: b.slug,
@@ -27,54 +27,49 @@ export default async function AdminPage() {
     needsData: b.needsData,
   }));
 
-  const adminCharts: AdminChart[] = chartRows.map((c) => ({
-    id: c.id,
-    brandSlug: c.brandSlug,
-    brandName: c.brandName,
-    category: c.category,
-    gender: c.gender,
-    needsData: c.needsData,
-    rowCount: c.rows.length,
-    updatedAt: c.updatedAt,
-    updatedBy: c.updatedBy,
-  }));
+  const charts: AdminChart[] = cat.charts
+    .map((c) => ({
+      id: c.id,
+      brandSlug: c.brandSlug,
+      brandName: c.brandName,
+      category: c.category,
+      gender: c.gender,
+      needsData: c.needsData,
+      rowCount: c.rows.length,
+      updatedAt: c.updatedAt,
+      updatedBy: c.updatedBy,
+    }))
+    .sort(
+      (a, b) =>
+        a.brandName.localeCompare(b.brandName) ||
+        a.category.localeCompare(b.category) ||
+        a.gender.localeCompare(b.gender)
+    );
 
-  const adminProducts: AdminProduct[] = productRows.map((p) => ({
+  const products: AdminProduct[] = cat.products.map((p) => ({
     id: p.id,
     brandSlug: p.brandSlug,
-    brandName: p.brandName ?? "",
+    brandName: nameOf.get(p.brandSlug) ?? p.brandSlug,
     category: p.category,
     name: p.name,
     priceInr: p.priceInr,
   }));
 
   return (
-    <section className="mx-auto max-w-[1600px] px-4 py-14 md:px-8 md:py-20">
+    <section className="mx-auto max-w-[1440px] px-4 py-12 md:px-8 md:py-16">
       <div className="mb-10 flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
-          <p className="font-mono text-[10px] tracking-[0.3em] text-frost">
-            RESTRICTED — DATA ROOM
-          </p>
-          <h1 className="mt-3 font-display text-5xl leading-[0.9] tracking-tight text-bone md:text-7xl">
-            CONTROL DECK<span className="text-frost">.</span>
+          <p className="kicker text-fog">Restricted · data room</p>
+          <h1 className="mt-3 font-display text-5xl font-light tracking-[-0.03em] text-bone md:text-6xl">
+            Control deck
           </h1>
         </div>
-        <div className="flex flex-col items-start gap-2 md:items-end">
-          <span className="border border-frost/40 px-3 py-1.5 font-mono text-[10px] tracking-[0.2em] text-frost uppercase">
-            DATASOURCE: {dataSourceName}
-          </span>
-          <p className="max-w-xs font-mono text-[10px] leading-relaxed tracking-[0.14em] text-fog">
-            ADDING A BRAND = NAME + ONE TABLE PER CATEGORY. PASTE CSV FROM ANY
-            OFFICIAL CHART ONLINE. NO DEPLOY REQUIRED.
-          </p>
-        </div>
+        <p className="kicker max-w-xs text-fog md:text-right">
+          A brand is a name plus one table per category. Paste CSV from any
+          official chart. Changes reach the public site within a minute.
+        </p>
       </div>
-      <AdminApp
-        mode={dataSourceName}
-        brands={adminBrands}
-        charts={adminCharts}
-        products={adminProducts}
-      />
+      <AdminApp brands={brands} charts={charts} products={products} />
     </section>
   );
 }
