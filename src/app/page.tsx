@@ -12,8 +12,10 @@ import {
   type Brand,
 } from "@/lib/catalog";
 import {
+  ANCHOR_LABEL,
   CATEGORY_ORDER,
   CATEGORIES,
+  GROUPS,
   rowPrimaryLabel,
   type CategoryId,
 } from "@/lib/categories";
@@ -69,6 +71,18 @@ export default async function Home() {
     ),
     ...charted.filter((b) => !FEATURED.includes(b.slug)),
   ].slice(0, 5);
+
+  const lineData = (line: "sneakers" | "running") => {
+    const all = brandsIn(cat, line);
+    const charts = chartsIn(cat, line);
+    const withCharts = all.filter((b) => charts[b.slug]);
+    const feat = [
+      ...FEATURED.map((slug) => withCharts.find((b) => b.slug === slug)).filter((b): b is Brand => !!b),
+      ...withCharts.filter((b) => !FEATURED.includes(b.slug)),
+    ].slice(0, 5);
+    return { featured: liteBrands(feat), brands: liteBrands(all), charts };
+  };
+  const heroLines = { sneakers: lineData("sneakers"), running: lineData("running") };
 
   // Copy from the data itself: two brands that disagree at 26.5 cm.
   let disagreement: [string, string, string, string] | null = null;
@@ -163,11 +177,7 @@ export default async function Home() {
               </Rise>
             </div>
             <Rise delay={0.2} className="lg:col-span-8">
-              <Hero
-                featured={liteBrands(featured)}
-                brands={liteBrands(sneakerBrands)}
-                charts={sneakerCharts}
-              />
+              <Hero lines={heroLines} />
               <p className="kicker mt-3 text-fog">
                 Drag the scale · pick a brand · wave over the number
               </p>
@@ -227,43 +237,46 @@ export default async function Home() {
       {/* ----------------------------------------------------- categories */}
       <section id="categories" className="scroll-mt-14 border-b border-bone/10">
         <div className="mx-auto max-w-[1440px] px-4 py-20 md:px-8 md:py-28">
-          <SectionHead index="03" kicker="Categories" title={<>Four scales, kept apart.</>}>
-            Slides run roomier than sneakers; tees and trousers are anchored to
-            chest and waist. Each category keeps its own anchor, so nothing is
-            converted across the line.
+          <SectionHead index="03" kicker="Categories" title={<>Three measurements. Ten ways to shop.</>}>
+            Every shoe reads your foot length, every top your chest, every bottom
+            your waist. Size one pair of Air Force 1s and your running-shoe size
+            follows — and where a line fits differently, it has its own chart.
           </SectionHead>
-          <ul className="mt-12 border-t border-bone/12">
-            {perCategory.map((c, i) => {
-              const def = CATEGORIES[c.id];
-              return (
-                <li key={c.id}>
-                  <FadeUp delay={i * 0.05}>
-                    <Link
-                      href={`/category/${c.id}`}
-                      className="group grid grid-cols-[2.5rem_1fr_auto] items-center gap-4 border-b border-bone/12 py-6 transition-colors hover:bg-coal md:grid-cols-12 md:py-8"
-                    >
-                      <span className="font-mono text-sm text-fog tabular md:col-span-1 md:pl-2">
-                        0{i + 1}
-                      </span>
-                      <span className="font-display text-3xl font-light tracking-[-0.02em] text-bone md:col-span-5 md:text-5xl">
-                        {def.label}
-                      </span>
-                      <span className="kicker hidden text-fog md:col-span-3 md:block">
-                        Anchor · {def.anchor}, cm
-                      </span>
-                      <span className="kicker hidden text-fog md:col-span-2 md:block">
-                        <span className="text-bone">{c.brands}</span> brands ·{" "}
-                        <span className="text-bone">{c.charted}</span> charted
-                      </span>
-                      <span className="flex justify-end pr-2 font-mono text-lg text-fog transition-all group-hover:translate-x-1 group-hover:text-frost md:col-span-1">
-                        →
-                      </span>
-                    </Link>
-                  </FadeUp>
-                </li>
-              );
-            })}
-          </ul>
+          <div className="mt-12 grid gap-px border border-bone/12 bg-bone/12 lg:grid-cols-3">
+            {GROUPS.map((g, gi) => (
+              <div key={g.id} className="bg-ink">
+                <FadeUp delay={gi * 0.06}>
+                  <div className="flex items-baseline justify-between border-b border-bone/12 px-5 py-4">
+                    <span className="font-display text-2xl font-light text-bone">{g.label}</span>
+                    <span className="kicker text-fog">Anchor · {ANCHOR_LABEL[g.anchorKey]}</span>
+                  </div>
+                  <ul>
+                    {g.categories.map((id) => {
+                      const c = perCategory.find((x) => x.id === id)!;
+                      return (
+                        <li key={id}>
+                          <Link
+                            href={`/category/${id}`}
+                            className="group flex items-center justify-between gap-4 border-b border-bone/8 px-5 py-4 transition-colors hover:bg-coal"
+                          >
+                            <span>
+                              <span className="block text-base text-bone">{CATEGORIES[id].label}</span>
+                              <span className="kicker text-fog">
+                                {c.brands} brands · {c.charted} charted
+                              </span>
+                            </span>
+                            <span className="font-mono text-fog transition-all group-hover:translate-x-1 group-hover:text-frost">
+                              →
+                            </span>
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </FadeUp>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -276,13 +289,31 @@ export default async function Home() {
             you&apos;ll still get an answer, built from brands that do have one,
             and it will say so.
           </SectionHead>
-          <FadeUp delay={0.1} className="scroll-thin mt-12 overflow-x-auto md:ml-[25%]">
-            <table className="w-full min-w-[560px] border-collapse">
+          <FadeUp delay={0.1} className="scroll-thin mt-12 overflow-x-auto">
+            <table className="w-full min-w-[820px] border-collapse">
               <thead>
+                <tr>
+                  <th />
+                  {GROUPS.map((g) => (
+                    <th
+                      key={g.id}
+                      colSpan={g.categories.length}
+                      className="kicker border-b border-l border-bone/12 px-2 pb-2 text-left font-normal text-bone"
+                    >
+                      {g.label}
+                    </th>
+                  ))}
+                </tr>
                 <tr className="border-b border-bone/12">
                   <th className="kicker py-3 pr-4 text-left font-normal text-fog">Brand</th>
                   {CATEGORY_ORDER.map((c) => (
-                    <th key={c} className="kicker px-2 py-3 text-left font-normal text-fog">
+                    <th
+                      key={c}
+                      className={cn(
+                        "kicker px-2 py-3 text-left font-normal text-fog",
+                        GROUPS.some((g) => g.categories[0] === c) && "border-l border-bone/12"
+                      )}
+                    >
                       {CATEGORIES[c].nav}
                     </th>
                   ))}
@@ -297,7 +328,13 @@ export default async function Home() {
                       const genders = Object.keys(chartsBy[c][b.slug] ?? {});
                       const state = !sold ? "none" : genders.length ? "chart" : "estimate";
                       return (
-                        <td key={c} className="px-2 py-2.5">
+                        <td
+                          key={c}
+                          className={cn(
+                            "px-2 py-2",
+                            GROUPS.some((g) => g.categories[0] === c) && "border-l border-bone/12"
+                          )}
+                        >
                           {state === "none" ? (
                             <span className="kicker text-fog/30" aria-label="Not sold">·</span>
                           ) : (
@@ -311,7 +348,12 @@ export default async function Home() {
                                   state === "chart" ? "bg-bone" : "border border-signal"
                                 )}
                               />
-                              {state === "chart" ? genders.map((g) => g[0].toUpperCase()).sort().join(" ") : "Est."}
+                              <span className="sr-only">
+                                {state === "chart" ? `Chart: ${genders.join(", ")}` : "Estimate"}
+                              </span>
+                              <span aria-hidden="true">
+                                {state === "chart" ? genders.map((g) => g[0].toUpperCase()).sort().join("") : "est"}
+                              </span>
                             </Link>
                           )}
                         </td>

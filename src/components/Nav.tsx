@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CATEGORY_ORDER, CATEGORIES } from "@/lib/categories";
+import { ANCHOR_LABEL, CATEGORIES, GROUPS, type GroupId } from "@/lib/categories";
 import { cn } from "@/lib/format";
 import { useProfile } from "@/lib/profile";
 import { Wordmark } from "@/components/Logo";
@@ -12,6 +12,7 @@ export default function Nav() {
   const pathname = usePathname();
   const { profile, user, ready } = useProfile();
   const [open, setOpen] = useState(false);
+  const [menu, setMenu] = useState<GroupId | null>(null);
   const anchors = Object.keys(profile).length;
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
@@ -23,23 +24,65 @@ export default function Nav() {
           <Wordmark />
         </Link>
 
-        <nav aria-label="Categories" className="hidden h-full items-stretch lg:flex">
-          {CATEGORY_ORDER.map((c) => {
-            const href = `/category/${c}`;
-            const active = isActive(href);
+        <nav
+          aria-label="Categories"
+          className="hidden h-full items-stretch lg:flex"
+          onKeyDown={(e) => e.key === "Escape" && setMenu(null)}
+        >
+          {GROUPS.map((g) => {
+            const active = g.categories.some((c) => isActive(`/category/${c}`));
+            const expanded = menu === g.id;
             return (
-              <Link
-                key={c}
-                href={href}
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  "kicker relative flex items-center px-4 transition-colors",
-                  active ? "text-bone" : "text-fog hover:text-bone"
-                )}
+              <div
+                key={g.id}
+                className="relative flex"
+                onMouseEnter={() => setMenu(g.id)}
+                onMouseLeave={() => setMenu(null)}
+                onBlur={(e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget as Node)) setMenu(null);
+                }}
               >
-                {CATEGORIES[c].nav}
-                {active && <span className="absolute inset-x-4 bottom-0 h-px bg-signal" />}
-              </Link>
+                <button
+                  aria-expanded={expanded}
+                  aria-controls={`menu-${g.id}`}
+                  onClick={() => setMenu(expanded ? null : g.id)}
+                  className={cn(
+                    "kicker relative flex items-center gap-1.5 px-4 transition-colors",
+                    active || expanded ? "text-bone" : "text-fog hover:text-bone"
+                  )}
+                >
+                  {g.label}
+                  <span aria-hidden="true" className={cn("text-[9px] transition-transform", expanded && "rotate-180")}>
+                    ▾
+                  </span>
+                  {active && <span className="absolute inset-x-4 bottom-0 h-px bg-frost" />}
+                </button>
+                {expanded && (
+                  <ul
+                    id={`menu-${g.id}`}
+                    className="absolute top-full left-0 min-w-64 border border-bone/12 bg-ink py-2"
+                  >
+                    {g.categories.map((c) => (
+                      <li key={c}>
+                        <Link
+                          href={`/category/${c}`}
+                          onClick={() => setMenu(null)}
+                          aria-current={isActive(`/category/${c}`) ? "page" : undefined}
+                          className={cn(
+                            "block px-4 py-2.5 text-sm transition-colors hover:bg-coal",
+                            isActive(`/category/${c}`) ? "text-frost" : "text-bone/85 hover:text-bone"
+                          )}
+                        >
+                          {CATEGORIES[c].label}
+                        </Link>
+                      </li>
+                    ))}
+                    <li className="kicker mt-1 border-t border-bone/10 px-4 pt-3 pb-1 text-fog">
+                      One {ANCHOR_LABEL[g.anchorKey].toLowerCase()} for all
+                    </li>
+                  </ul>
+                )}
+              </div>
             );
           })}
           <Link
@@ -103,23 +146,30 @@ export default function Nav() {
           onClick={() => setOpen(false)}
           className="border-t border-bone/10 bg-ink lg:hidden"
         >
-          <ul className="mx-auto max-w-[1440px] px-4 py-2 md:px-8">
-            {[
-              ...CATEGORY_ORDER.map((c) => ({ href: `/category/${c}`, label: CATEGORIES[c].label })),
-              { href: "/measure", label: "How to measure" },
-              { href: "/onboarding", label: "Find my size" },
-            ].map((l, i) => (
-              <li key={l.href} className="border-b border-bone/10 last:border-0">
-                <Link
-                  href={l.href}
-                  className="flex items-baseline gap-4 py-4 font-display text-xl font-light text-bone"
-                >
-                  <span className="kicker w-6 text-fog">{String(i + 1).padStart(2, "0")}</span>
-                  {l.label}
-                </Link>
-              </li>
+          <div className="mx-auto grid max-w-[1440px] gap-6 px-4 py-5 sm:grid-cols-3 md:px-8">
+            {GROUPS.map((g) => (
+              <div key={g.id}>
+                <p className="kicker mb-2 text-fog">{g.label}</p>
+                <ul>
+                  {g.categories.map((c) => (
+                    <li key={c} className="border-b border-bone/10">
+                      <Link href={`/category/${c}`} className="block py-3 font-display text-lg font-light text-bone">
+                        {CATEGORIES[c].label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ))}
-          </ul>
+            <div className="flex flex-wrap gap-2 sm:col-span-3">
+              <Link href="/measure" className="kicker flex h-11 items-center border border-bone/20 px-4 text-bone">
+                How to measure
+              </Link>
+              <Link href="/onboarding" className="kicker flex h-11 items-center bg-signal px-4 text-bone">
+                Find my size
+              </Link>
+            </div>
+          </div>
         </nav>
       )}
     </header>

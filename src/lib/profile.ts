@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import type { Unsubscribe } from "firebase/firestore";
-import type { CategoryId, ShopperGender } from "@/lib/categories";
+import { siblingsOf, type CategoryId, type ShopperGender } from "@/lib/categories";
 import {
   clientFs,
   initClientFirebase,
@@ -293,16 +293,29 @@ export function setGender(g: ShopperGender) {
 export const signIn = () => signInGoogle();
 export const signOut = () => signOutUser();
 
-/** Anchor for a category — preferred gender first, then the other one. */
+/**
+ * The anchor to use for a category. An entry saved for that exact category
+ * wins (it captures personal preference — e.g. running shoes worn half a
+ * size up). Otherwise the most recent entry from any category sharing the
+ * same body measurement is used: an Air Force 1 size tells us your foot
+ * length, which then reads straight into a running-shoe chart.
+ * Preferred gender first, then the other one.
+ */
 export function entryFor(
   profile: Profile,
   category: CategoryId,
   gender: ShopperGender
-): { entry: ProfileEntry; gender: ShopperGender } | null {
+): { entry: ProfileEntry; gender: ShopperGender; from: CategoryId } | null {
   const other: ShopperGender = gender === "men" ? "women" : "men";
   for (const g of [gender, other]) {
-    const e = profile[entryKey(category, g)];
-    if (e) return { entry: e, gender: g };
+    const own = profile[entryKey(category, g)];
+    if (own) return { entry: own, gender: g, from: category };
+    let best: { entry: ProfileEntry; from: CategoryId } | null = null;
+    for (const c of siblingsOf(category)) {
+      const e = profile[entryKey(c, g)];
+      if (e && (!best || e.updatedAt > best.entry.updatedAt)) best = { entry: e, from: c };
+    }
+    if (best) return { ...best, gender: g };
   }
   return null;
 }

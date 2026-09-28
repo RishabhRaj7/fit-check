@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import BrandMark from "@/components/BrandMark";
 import BrandSizing from "@/components/BrandSizing";
-import { brandsIn, chartsIn, getCatalog, liteBrands } from "@/lib/catalog";
+import { brandsIn, chartsByFit, getCatalog, linesFor, liteBrands } from "@/lib/catalog";
 import { CATEGORY_ORDER, CATEGORIES, isCategory } from "@/lib/categories";
 import { cn, inr } from "@/lib/format";
 
@@ -35,8 +35,14 @@ export default async function BrandPage({ params }: Props) {
   // A brand reached through an old link for a category it doesn't sell still
   // converts — it simply joins the list for this page.
   const brands = liteBrands(inCategory.some((b) => b.slug === slug) ? inCategory : [...inCategory, brand]);
-  const charts = chartsIn(cat, category);
-  const own = cat.charts.filter((c) => c.brandSlug === slug && c.category === category && c.rows.length);
+  const byFit = chartsByFit(cat, category);
+  const ownAll = cat.charts.filter((c) => c.brandSlug === slug && c.category === category && c.rows.length);
+  const own = ownAll.filter((c) => c.fit === "regular");
+  const targetFits = [...new Set(ownAll.map((c) => c.fit))];
+  const primary = own.find((c) => c.gender === "men") ?? own[0];
+  const source = primary?.source
+    ? { label: primary.source, url: primary.sourceUrl, basis: primary.basis }
+    : null;
   const updated = own.map((c) => c.updatedAt).sort().at(-1);
   const products = cat.products.filter((p) => p.brandSlug === slug && p.category === category);
 
@@ -107,7 +113,10 @@ export default async function BrandPage({ params }: Props) {
           category={category}
           target={{ slug: brand.slug, name: brand.name }}
           brands={brands}
-          charts={charts}
+          chartsByFit={byFit}
+          targetFits={targetFits}
+          lines={linesFor(cat, category)}
+          source={source}
         />
       </section>
 

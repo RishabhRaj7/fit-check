@@ -1,0 +1,55 @@
+/* Starter products (names + INR prices) shown on brand pages. */
+export interface ProductSeed {
+  brand: string;
+  category: string;
+  name: string;
+  price: number;
+}
+
+export const PRODUCTS: ProductSeed[] = [
+  { brand: "nike", category: "sneakers", name: "Air Force 1 '07", price: 7995 },
+  { brand: "nike", category: "running", name: "Pegasus 41", price: 11495 },
+  { brand: "nike", category: "sneakers", name: "Air Jordan 1 Low", price: 8995 },
+  { brand: "nike", category: "slides", name: "Calm Slide", price: 4195 },
+  { brand: "nike", category: "tshirt", name: "Sportswear Club Tee", price: 1895 },
+  { brand: "adidas", category: "sneakers", name: "Samba OG", price: 10999 },
+  { brand: "adidas", category: "running", name: "Ultraboost 5", price: 16999 },
+  { brand: "adidas", category: "sneakers", name: "Superstar II", price: 8999 },
+  { brand: "adidas", category: "slides", name: "Adilette Comfort", price: 2799 },
+  { brand: "adidas", category: "tshirt", name: "Essentials 3-Stripes Tee", price: 1599 },
+  { brand: "puma", category: "sneakers", name: "Palermo Lth", price: 7999 },
+  { brand: "puma", category: "running", name: "Velocity NITRO 4", price: 9999 },
+  { brand: "puma", category: "slides", name: "Leadcat 2.0", price: 1999 },
+  { brand: "puma", category: "tshirt", name: "Essentials Logo Tee", price: 1299 },
+  { brand: "new-balance", category: "sneakers", name: "530", price: 7999 },
+  { brand: "new-balance", category: "running", name: "Fresh Foam Arishi v4", price: 6999 },
+  { brand: "asics", category: "running", name: "GEL-Kayano 31", price: 15999 },
+  { brand: "asics", category: "running", name: "GT-1000 13", price: 9999 },
+  { brand: "skechers", category: "running", name: "GO WALK 7", price: 7499 },
+  { brand: "skechers", category: "slides", name: "GO Recovery Slide", price: 2499 },
+  { brand: "reebok", category: "sneakers", name: "Club C 85", price: 7999 },
+  { brand: "hrx", category: "running", name: "Flight Pro Running", price: 2799 },
+  { brand: "hrx", category: "tshirt", name: "Rapid-Dry Training Tee", price: 699 },
+  { brand: "bata", category: "sneakers", name: "North Star Pulse", price: 1499 },
+  { brand: "bata", category: "slides", name: "Comfort Chappal", price: 599 },
+  { brand: "woodland", category: "formal", name: "Trail Blazer Mid", price: 3995 },
+  { brand: "woodland", category: "slides", name: "Outdoor Sandal", price: 1995 },
+  { brand: "decathlon", category: "running", name: "Kalenji Jogflow 500", price: 2999 },
+  { brand: "decathlon", category: "tshirt", name: "Domyos Essential Tee", price: 399 },
+  { brand: "levis", category: "trousers", name: "511 Slim Fit Jeans", price: 3999 },
+  { brand: "levis", category: "trousers", name: "501 Original Fit", price: 4499 },
+  { brand: "levis", category: "tshirt", name: "Graphic Batwing Tee", price: 1599 },
+  { brand: "hm", category: "tshirt", name: "Regular Fit Tee", price: 799 },
+  { brand: "hm", category: "trousers", name: "Slim Fit Chinos", price: 2299 },
+  { brand: "zara", category: "tshirt", name: "Basic Slim Tee", price: 1590 },
+  { brand: "zara", category: "trousers", name: "Comfort Fit Trouser", price: 3590 },
+  { brand: "uniqlo", category: "tshirt", name: "Supima Cotton Crew", price: 1490 },
+  { brand: "uniqlo", category: "trousers", name: "EZY Ankle Pants", price: 2990 },
+  { brand: "marks-spencer", category: "tshirt", name: "Pure Cotton Crew Tee", price: 1299 },
+  { brand: "marks-spencer", category: "trousers", name: "Regular Fit Chino", price: 2999 },
+  { brand: "van-heusen", category: "tshirt", name: "Athleisure Polo Tee", price: 1399 },
+  { brand: "allen-solly", category: "trousers", name: "Slim Formal Trouser", price: 2499 },
+  { brand: "peter-england", category: "trousers", name: "Flat Front Trouser", price: 1799 },
+  { brand: "us-polo-assn", category: "tshirt", name: "Iconic Logo Tee", price: 1499 },
+  { brand: "us-polo-assn", category: "sneakers", name: "Court Classic Sneaker", price: 2799 },
+];

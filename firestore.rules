@@ -20,9 +20,9 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == uid;
     }
 
-    // { sizeProfile: map (≤ 16 anchors), updatedAt: number }
+    // { sizeProfile: map (≤ 40 entries), updatedAt: number }
     function validValues(d) {
-      return (!("sizeProfile" in d) || (d.sizeProfile is map && d.sizeProfile.size() <= 16))
+      return (!("sizeProfile" in d) || (d.sizeProfile is map && d.sizeProfile.size() <= 40))
         && (!("updatedAt" in d) || d.updatedAt is number);
     }
 

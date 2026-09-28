@@ -24,8 +24,13 @@ export interface SizeRow {
   label: string | null;
 }
 
-/** brandSlug → gender → rows (sorted by anchorValue). One category's worth. */
+/**
+ * brandSlug → gender → rows (sorted by anchorValue). One category's worth.
+ * Keys starting with "~" are fallback charts from a related category (keyed
+ * by brand name), used only to vote on estimates when the category has none.
+ */
 export type CategoryCharts = Record<string, Partial<Record<Gender, SizeRow[]>>>;
+export const FALLBACK_PREFIX = "~";
 
 export interface LiteBrand {
   slug: string;
@@ -45,6 +50,8 @@ export interface Match {
   basedOn: string[];
   /** True when the anchor sits outside the chart's range. */
   outOfRange: boolean;
+  /** Estimate built from a related category's charts (none on file here). */
+  crossCategory?: boolean;
 }
 
 /** Tolerance under which a row counts as an exact hit. */
@@ -110,14 +117,25 @@ export function convert(
   // No chart for the target — let sibling brands vote on the primary label.
   const key = primaryRegion(category).key;
   const votes: { label: string; row: SizeRow; name: string }[] = [];
-  for (const b of brands) {
-    if (b.slug === brandSlug) continue;
-    const c = chartFor(charts, b.slug, gender);
-    if (!c) continue;
+  const vote = (slug: string, name: string) => {
+    const c = chartFor(charts, slug, gender);
+    if (!c) return;
     const { row } = nearestRow(c.rows, anchor);
     const label = regionValue(row, key);
-    if (label !== "—") votes.push({ label, row, name: b.name });
+    if (label !== "—") votes.push({ label, row, name });
+  };
+  for (const b of brands) {
+    if (b.slug !== brandSlug) vote(b.slug, b.name);
     if (votes.length >= 8) break;
+  }
+  let crossCategory = false;
+  if (votes.length === 0) {
+    for (const k of Object.keys(charts)) {
+      if (!k.startsWith(FALLBACK_PREFIX)) continue;
+      vote(k, k.slice(FALLBACK_PREFIX.length));
+      if (votes.length >= 8) break;
+    }
+    crossCategory = votes.length > 0;
   }
   if (votes.length === 0) {
     return { status: "none", row: null, genderUsed: null, distance: 0, basedOn: [], outOfRange: false };
@@ -140,6 +158,7 @@ export function convert(
     distance: 0,
     basedOn: votes.map((v) => v.name),
     outOfRange: false,
+    crossCategory,
   };
 }
 

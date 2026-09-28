@@ -34,6 +34,7 @@ export default async function AdminPage() {
       brandName: c.brandName,
       category: c.category,
       gender: c.gender,
+      fit: c.fit,
       needsData: c.needsData,
       rowCount: c.rows.length,
       updatedAt: c.updatedAt,
@@ -43,7 +44,8 @@ export default async function AdminPage() {
       (a, b) =>
         a.brandName.localeCompare(b.brandName) ||
         a.category.localeCompare(b.category) ||
-        a.gender.localeCompare(b.gender)
+        a.gender.localeCompare(b.gender) ||
+        a.fit.localeCompare(b.fit)
     );
 
   const products: AdminProduct[] = cat.products.map((p) => ({

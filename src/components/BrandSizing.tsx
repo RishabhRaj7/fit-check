@@ -1,12 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import AnchorInput, { type Anchor } from "@/components/AnchorInput";
+import AnchorInput, { type Anchor, type Lines } from "@/components/AnchorInput";
 import ParticleReadout from "@/components/ParticleReadout";
 import SizePassport from "@/components/SizePassport";
 import {
   CATEGORIES,
+  FIT_LABEL,
+  FIT_ORDER,
   GENDERS,
+  type Fit,
   formatCm,
   regionValue,
   rowPrimaryLabel,
@@ -17,18 +20,35 @@ import { cn } from "@/lib/format";
 import { entryFor, saveEntry, setGender, useProfile } from "@/lib/profile";
 import { convert, type CategoryCharts, type LiteBrand } from "@/lib/sizing";
 
+export interface ChartSource {
+  label: string;
+  url: string | null;
+  basis: "body" | "garment";
+}
+
 export default function BrandSizing({
   category,
   target,
   brands,
-  charts,
+  chartsByFit,
+  targetFits,
+  lines,
+  source,
 }: {
   category: CategoryId;
   target: LiteBrand;
   brands: LiteBrand[];
-  charts: CategoryCharts;
+  /** Always has "regular"; other fits when any brand publishes them. */
+  chartsByFit: Partial<Record<Fit, CategoryCharts>>;
+  /** Fits this brand publishes its own chart for. */
+  targetFits: Fit[];
+  lines?: Lines;
+  source?: ChartSource | null;
 }) {
   const def = CATEGORIES[category];
+  const fits = FIT_ORDER.filter((f) => chartsByFit[f]);
+  const [fit, setFit] = useState<Fit>("regular");
+  const charts = useMemo(() => chartsByFit[fit] ?? chartsByFit.regular ?? {}, [chartsByFit, fit]);
   const { profile, gender, user, ready } = useProfile();
   const saved = entryFor(profile, category, gender);
   const [draft, setDraft] = useState<{ gender: ShopperGender; anchor: Anchor } | null>(null);
@@ -47,12 +67,15 @@ export default function BrandSizing({
     [anchor, charts, brands, category, target.slug, gender]
   );
   const primary = match?.row ? rowPrimaryLabel(category, match.row) : null;
+  const saveTo: CategoryId = anchor?.sourceCategory ?? category;
+  const savedHere = profile[`${saveTo}:${gender}`];
   const isSaved =
     !!anchor &&
-    !!saved &&
-    saved.gender === gender &&
-    saved.entry.anchorValue === anchor.anchorValue &&
-    saved.entry.sourceBrandSlug === anchor.sourceBrandSlug;
+    !!savedHere &&
+    savedHere.anchorValue === anchor.anchorValue &&
+    savedHere.sourceBrandSlug === anchor.sourceBrandSlug;
+  const inferredFrom =
+    !draft && saved && saved.gender === gender && saved.from !== category ? saved.from : null;
 
   const ownGenders = GENDERS.filter((g) => charts[target.slug]?.[g.id]?.length);
   const [tableGender, setTableGender] = useState<ShopperGender | null>(null);
@@ -60,14 +83,14 @@ export default function BrandSizing({
   const tableRows = shownGender ? charts[target.slug]?.[shownGender] ?? [] : [];
   const hitRow =
     match?.row && match.status !== "estimate" && match.genderUsed === shownGender
-      ? match.row.anchorValue
+      ? match.row
       : null;
 
   const save = async () => {
     if (!anchor || !match) return;
     setSaving(true);
     try {
-      await saveEntry(category, gender, {
+      await saveEntry(saveTo, gender, {
         ...anchor,
         confidence: anchor.sourceBrandSlug === "measured" || match.status === "exact" ? "exact" : "inferred",
       });
@@ -108,9 +131,36 @@ export default function BrandSizing({
             brands={brands}
             charts={charts}
             exclude={target.slug}
+            lines={lines}
             value={anchor}
             onChange={(a) => setDraft({ gender, anchor: a })}
           />
+          {def.hasFits && fits.length > 1 && (
+            <div className="mt-6">
+              <p className="kicker mb-2 text-fog">Fit you&apos;re buying</p>
+              <div className="inline-flex flex-wrap gap-px border border-bone/12 bg-bone/12" role="group" aria-label="Fit">
+                {fits.map((f) => (
+                  <button
+                    key={f}
+                    aria-pressed={fit === f}
+                    onClick={() => setFit(f)}
+                    className={cn(
+                      "kicker px-3 py-2 transition-colors",
+                      fit === f ? "bg-bone text-ink" : "bg-ink text-fog hover:text-bone"
+                    )}
+                  >
+                    {FIT_LABEL[f]}
+                  </button>
+                ))}
+              </div>
+              {fit !== "regular" && !targetFits.includes(fit) && (
+                <p className="mt-2 text-xs leading-relaxed text-fog">
+                  {target.name} doesn&apos;t publish a separate {FIT_LABEL[fit].toLowerCase()} chart — showing
+                  their regular one.
+                </p>
+              )}
+            </div>
+          )}
           <p className="mt-6 border-l border-signal/60 pl-3 text-sm leading-relaxed text-fog">{def.fitNote}</p>
         </div>
 
@@ -156,6 +206,11 @@ export default function BrandSizing({
                   {def.anchor} {formatCm(anchor.anchorValue)} cm
                   {anchor.sourceBrandSlug !== "measured" && ` · via ${anchor.sourceBrandName ?? ""} ${anchor.sourceSizeLabel}`}
                 </span>
+                {inferredFrom && (
+                  <span className="kicker text-frost">
+                    From your {CATEGORIES[inferredFrom].label.toLowerCase()} size
+                  </span>
+                )}
               </div>
 
               <ParticleReadout text={primary ?? "—"} className="mt-6 h-[110px] md:h-[150px]" />
@@ -178,7 +233,9 @@ export default function BrandSizing({
                   We don&apos;t hold {target.name}&apos;s {def.label.toLowerCase()} chart yet.
                   This is what {match.basedOn.slice(0, 3).join(", ")}
                   {match.basedOn.length > 3 ? ` and ${match.basedOn.length - 3} more` : ""} say
-                  for your measurement — treat it as a starting point.
+                  for your measurement
+                  {match.crossCategory && " in their closest related charts, since no brand's chart for this category is on file yet"}
+                  {" "}— treat it as a starting point.
                 </p>
               )}
               {match.outOfRange && (
@@ -217,7 +274,21 @@ export default function BrandSizing({
             </p>
             <h2 id="chart-heading" className="mt-3 font-display text-3xl font-light tracking-[-0.02em] text-bone md:text-4xl">
               {target.name} {def.label.toLowerCase()}
+              {fit !== "regular" && targetFits.includes(fit) && ` · ${FIT_LABEL[fit].toLowerCase()} fit`}
             </h2>
+            {source && (
+              <p className="kicker mt-2 text-fog">
+                Source ·{" "}
+                {source.url ? (
+                  <a href={source.url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-4 hover:text-bone">
+                    {source.label}
+                  </a>
+                ) : (
+                  source.label
+                )}
+                {source.basis === "garment" && " · converted from garment measurements"}
+              </p>
+            )}
           </div>
           {ownGenders.length > 1 && (
             <div className="flex border border-bone/15" role="group" aria-label="Chart">
@@ -256,11 +327,11 @@ export default function BrandSizing({
                 </tr>
               </thead>
               <tbody>
-                {tableRows.map((r) => {
-                  const hit = r.anchorValue === hitRow;
+                {tableRows.map((r, i) => {
+                  const hit = r === hitRow;
                   return (
                     <tr
-                      key={r.anchorValue}
+                      key={i}
                       aria-current={hit ? "true" : undefined}
                       className={cn("border-b border-bone/8 last:border-0", hit && "bg-signal text-bone")}
                     >

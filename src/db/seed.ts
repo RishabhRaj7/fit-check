@@ -1,17 +1,32 @@
 import { config } from "dotenv";
-import { BRANDS, PRODUCTS } from "./seedData";
+import { CATALOG, RESEARCHED } from "./catalog";
+import { PRODUCTS } from "./catalog/products";
+import { chartDocId } from "../lib/chartId";
+import { slugify } from "../lib/format";
 
 /**
- * Seeds Firestore with the starter catalogue.
- * The public web config can only READ, so the script signs in with
- * email/password first (ADMIN_EMAIL + ADMIN_PASSWORD) — that account's UID
- * must be the admin UID in firestore.rules. The account is created on first
- * run if needed. Re-running is safe: it clears and rewrites.
+ * Writes the researched catalogue to Firestore. Safe to re-run:
  *
- *   npx tsx src/db/seed.ts
+ *  • brands   — upserted (merged), categories unioned with what's there, so
+ *               brands and edits made in /admin survive.
+ *  • charts   — researched charts are written; charts left by the old
+ *               formula-based seed (updatedBy "seed") are deleted. Charts
+ *               saved from /admin are never touched.
+ *  • products — upserted under stable ids; the old seed's random-id copies
+ *               of the same products are removed.
+ *
+ * The public web config can only READ, so the script signs in with
+ * ADMIN_EMAIL + ADMIN_PASSWORD — that account's UID must be the admin UID in
+ * firestore.rules. The account is created on first run if needed.
+ *
+ *   npm run seed            write
+ *   npm run seed -- --dry   print what would change, write nothing
  */
 
 config({ path: [".env.local", ".env"], quiet: true });
+
+const DRY = process.argv.includes("--dry");
+const SEEDER = "research-seed";
 
 async function main() {
   const cfg = {
@@ -22,90 +37,137 @@ async function main() {
     messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID ?? "",
     appId: process.env.FIREBASE_APP_ID ?? "",
   };
-  if (!cfg.apiKey || !cfg.projectId || !cfg.appId) {
-    throw new Error("FIREBASE_* web config incomplete");
-  }
-  const email = process.env.ADMIN_EMAIL ?? "";
-  const password = process.env.ADMIN_PASSWORD ?? "";
-  if (!email || !password) {
-    throw new Error(
-      "ADMIN_EMAIL and ADMIN_PASSWORD are required to seed Firestore " +
-        "(the account whose UID is the admin in firestore.rules)"
-    );
-  }
+  if (!cfg.apiKey || !cfg.projectId || !cfg.appId) throw new Error("FIREBASE_* web config incomplete");
 
   const { initializeApp } = await import("firebase/app");
-  const { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } =
-    await import("firebase/auth");
-  const {
-    getFirestore,
-    collection,
-    doc,
-    getDocs,
-    setDoc,
-    deleteDoc,
-    addDoc,
-  } = await import("firebase/firestore");
+  const { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } = await import("firebase/auth");
+  const { getFirestore, collection, doc, getDocs, writeBatch } = await import("firebase/firestore");
 
   const app = initializeApp(cfg);
-  const auth = getAuth(app);
   const fs = getFirestore(app);
 
-  console.log(`Signing in as ${email}…`);
-  try {
-    await signInWithEmailAndPassword(auth, email, password);
-  } catch {
-    console.log("Account not found — creating it…");
-    await createUserWithEmailAndPassword(auth, email, password);
-  }
-
-  console.log("Seeding Firestore…");
-  for (const col of ["brands", "charts", "products"]) {
-    const snap = await getDocs(collection(fs, col));
-    await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)));
-  }
-
-  let chartCount = 0;
-  let rowCount = 0;
-
-  for (const b of BRANDS) {
-    await setDoc(doc(fs, "brands", b.slug), {
-      name: b.name,
-      slug: b.slug,
-      categories: b.categories,
-      priority: b.priority,
-      needsData: b.needsData ?? false,
-      createdAt: new Date().toISOString(),
-    });
-
-    for (const c of b.charts) {
-      await setDoc(doc(fs, "charts", `${b.slug}__${c.category}__${c.gender}`), {
-        brandSlug: b.slug,
-        brandName: b.name,
-        category: c.category,
-        gender: c.gender,
-        needsData: false,
-        updatedBy: "seed",
-        updatedAt: new Date().toISOString(),
-        rows: c.rows,
-      });
-      chartCount++;
-      rowCount += c.rows.length;
+  if (!DRY) {
+    const email = process.env.ADMIN_EMAIL ?? "";
+    const password = process.env.ADMIN_PASSWORD ?? "";
+    if (!email || !password) {
+      throw new Error("ADMIN_EMAIL and ADMIN_PASSWORD are required (the account whose UID is the admin in firestore.rules)");
+    }
+    const auth = getAuth(app);
+    console.log(`Signing in as ${email}…`);
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch {
+      console.log("Account not found — creating it…");
+      await createUserWithEmailAndPassword(auth, email, password);
     }
   }
 
-  for (const p of PRODUCTS) {
-    await addDoc(collection(fs, "products"), {
-      brandSlug: p.brand,
-      category: p.category,
-      name: p.name,
-      priceInr: p.price,
-    });
+  const [brandSnap, chartSnap, productSnap] = await Promise.all([
+    getDocs(collection(fs, "brands")),
+    getDocs(collection(fs, "charts")),
+    getDocs(collection(fs, "products")),
+  ]);
+
+  // Firestore batches cap at 500 writes; chunk everything.
+  type Op = (b: ReturnType<typeof writeBatch>) => void;
+  const ops: Op[] = [];
+  const log: string[] = [];
+
+  /* brands */
+  const existingBrands = new Map(brandSnap.docs.map((d) => [d.id, d.data()]));
+  for (const b of CATALOG) {
+    const prev = existingBrands.get(b.slug);
+    const categories = [...new Set([...((prev?.categories as string[]) ?? []), ...b.categories])];
+    ops.push((batch) =>
+      batch.set(
+        doc(fs, "brands", b.slug),
+        {
+          name: b.name,
+          slug: b.slug,
+          priority: b.priority,
+          categories,
+          needsData: b.charts.length === 0,
+          ...(prev ? {} : { createdAt: new Date().toISOString() }),
+        },
+        { merge: true }
+      )
+    );
+    log.push(`${prev ? "update" : "create"} brand ${b.slug}`);
   }
 
+  /* charts */
+  const written = new Set<string>();
+  const now = new Date().toISOString();
+  for (const b of RESEARCHED) {
+    for (const c of b.charts) {
+      const id = chartDocId(b.slug, c.category, c.gender, c.fit ?? "regular");
+      written.add(id);
+      ops.push((batch) =>
+        batch.set(doc(fs, "charts", id), {
+          brandSlug: b.slug,
+          brandName: b.name,
+          category: c.category,
+          gender: c.gender,
+          fit: c.fit ?? "regular",
+          source: c.source,
+          sourceUrl: c.sourceUrl,
+          basis: c.basis ?? "body",
+          needsData: false,
+          updatedBy: SEEDER,
+          updatedAt: now,
+          rows: c.rows,
+        })
+      );
+    }
+  }
+  let removedCharts = 0;
+  for (const d of chartSnap.docs) {
+    const by = d.data().updatedBy;
+    if (!written.has(d.id) && (by === "seed" || by === SEEDER)) {
+      ops.push((batch) => batch.delete(d.ref));
+      removedCharts++;
+      log.push(`delete stale chart ${d.id}`);
+    }
+  }
+
+  /* products */
+  const brandSlugs = new Set(CATALOG.map((b) => b.slug));
+  const productKey = (brand: string, name: string) => `${brand}__${slugify(name)}`;
+  const wanted = new Set<string>();
+  for (const p of PRODUCTS) {
+    if (!brandSlugs.has(p.brand)) continue;
+    const id = `seed__${productKey(p.brand, p.name)}`;
+    wanted.add(productKey(p.brand, p.name));
+    ops.push((batch) =>
+      batch.set(doc(fs, "products", id), { brandSlug: p.brand, category: p.category, name: p.name, priceInr: p.price })
+    );
+  }
+  for (const d of productSnap.docs) {
+    const x = d.data();
+    if (!d.id.startsWith("seed__") && wanted.has(productKey(String(x.brandSlug), String(x.name)))) {
+      ops.push((batch) => batch.delete(d.ref));
+      log.push(`delete duplicate product ${d.id}`);
+    }
+  }
+
+  const chartCount = written.size;
+  const rowCount = RESEARCHED.reduce((n, b) => n + b.charts.reduce((m, c) => m + c.rows.length, 0), 0);
   console.log(
-    `Seeded Firestore: ${BRANDS.length} brands, ${chartCount} charts, ${rowCount} rows, ${PRODUCTS.length} products.`
+    `${CATALOG.length} brands (${RESEARCHED.length} with researched charts), ${chartCount} charts / ${rowCount} rows, ` +
+      `${removedCharts} stale charts to remove, ${ops.length} writes in total.`
   );
+
+  if (DRY) {
+    console.log(log.filter((l) => !l.startsWith("update brand")).join("\n"));
+    console.log("Dry run — nothing written.");
+    return;
+  }
+  for (let i = 0; i < ops.length; i += 450) {
+    const batch = writeBatch(fs);
+    ops.slice(i, i + 450).forEach((op) => op(batch));
+    await batch.commit();
+  }
+  console.log("Done.");
 }
 
 main()

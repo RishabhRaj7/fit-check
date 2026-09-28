@@ -1,12 +1,13 @@
 "use client";
 
-import { useId, useMemo, useState } from "react";
+import { useId, useState } from "react";
 import Link from "next/link";
 import Ruler from "@/components/Ruler";
 import {
   CATEGORIES,
   formatCm,
   rowPrimaryLabel,
+  siblingsOf,
   type CategoryId,
   type ShopperGender,
 } from "@/lib/categories";
@@ -20,7 +21,12 @@ export interface Anchor {
   sourceBrandSlug: string;
   sourceBrandName?: string;
   sourceSizeLabel: string;
+  /** The line the size came from (e.g. a lifestyle-sneaker size used on a running page). */
+  sourceCategory?: CategoryId;
 }
+
+/** A sibling category's charts, so a size from one line can anchor another. */
+export type Lines = Partial<Record<CategoryId, { brands: LiteBrand[]; charts: CategoryCharts }>>;
 
 export type AnchorMode = "known" | "measure";
 
@@ -46,6 +52,7 @@ export default function AnchorInput({
   onChange,
   exclude,
   initialMode,
+  lines,
 }: {
   category: CategoryId;
   gender: ShopperGender;
@@ -56,12 +63,22 @@ export default function AnchorInput({
   /** Brand to leave out of the "I know" list (the one being converted to). */
   exclude?: string;
   initialMode?: AnchorMode;
+  /** Other lines sharing this body measurement (sneakers ↔ running…). */
+  lines?: Lines;
 }) {
   const def = CATEGORIES[category];
   const uid = useId();
-  const options = useMemo(
-    () => brands.filter((b) => chartFor(charts, b.slug, gender) && b.slug !== exclude),
-    [brands, charts, gender, exclude]
+  const lineIds = [
+    category,
+    ...siblingsOf(category).filter((c) => c !== category && lines?.[c]),
+  ];
+  const [line, setLine] = useState<CategoryId>(
+    value?.sourceCategory && lineIds.includes(value.sourceCategory) ? value.sourceCategory : category
+  );
+  const lineBrands = line === category ? brands : lines?.[line]?.brands ?? [];
+  const lineCharts = line === category ? charts : lines?.[line]?.charts ?? {};
+  const options = lineBrands.filter(
+    (b) => chartFor(lineCharts, b.slug, gender) && !(line === category && b.slug === exclude)
   );
   const [mode, setMode] = useState<AnchorMode>(
     initialMode ?? (value?.sourceBrandSlug === "measured" || options.length === 0 ? "measure" : "known")
@@ -72,7 +89,7 @@ export default function AnchorInput({
       : options[0]?.slug ?? ""
   );
   const current = options.find((o) => o.slug === slug) ?? options[0];
-  const rows = current ? chartFor(charts, current.slug, gender)?.rows ?? [] : [];
+  const rows = current ? chartFor(lineCharts, current.slug, gender)?.rows ?? [] : [];
   const cm = value?.anchorValue ?? def.anchorDefault;
   const [typed, setTyped] = useState<string | null>(null);
 
@@ -103,6 +120,30 @@ export default function AnchorInput({
         ))}
       </div>
 
+      {mode === "known" && lineIds.length > 1 && (
+        <div className="mt-6">
+          <p className="kicker mb-2 text-fog">From</p>
+          <div className="flex flex-wrap gap-px border border-bone/12 bg-bone/12 sm:inline-flex" role="group" aria-label="Product line">
+            {lineIds.map((c) => (
+              <button
+                key={c}
+                aria-pressed={line === c}
+                onClick={() => {
+                  setLine(c);
+                  setSlug("");
+                }}
+                className={cn(
+                  "kicker px-3 py-2 transition-colors",
+                  line === c ? "bg-bone text-ink" : "bg-ink text-fog hover:text-bone"
+                )}
+              >
+                {CATEGORIES[c].nav}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {mode === "known" && current ? (
         <div className="mt-6">
           <label htmlFor={`${uid}-brand`} className="kicker mb-2 block text-fog">
@@ -127,7 +168,7 @@ export default function AnchorInput({
           </div>
 
           <p id={`${uid}-sizes`} className="kicker mt-6 mb-2 text-fog">
-            Your size in {current.name}
+            Your {CATEGORIES[line].nav.toLowerCase()} size in {current.name}
           </p>
           <div
             role="radiogroup"
@@ -135,12 +176,15 @@ export default function AnchorInput({
             className="scroll-thin grid max-h-60 grid-cols-3 overflow-y-auto border-t border-l border-bone/12 sm:grid-cols-4"
           >
             {rows.map((r) => {
-              const label = rowPrimaryLabel(category, r);
+              const label = rowPrimaryLabel(line, r);
               const active =
-                value?.sourceBrandSlug === current.slug && value.anchorValue === r.anchorValue;
+                value?.sourceBrandSlug === current.slug &&
+                value.anchorValue === r.anchorValue &&
+                value.sourceSizeLabel === label &&
+                (value.sourceCategory ?? category) === line;
               return (
                 <button
-                  key={r.anchorValue}
+                  key={`${r.anchorValue}-${label}`}
                   role="radio"
                   aria-checked={active}
                   onClick={() =>
@@ -149,6 +193,7 @@ export default function AnchorInput({
                       sourceBrandSlug: current.slug,
                       sourceBrandName: current.name,
                       sourceSizeLabel: label,
+                      sourceCategory: line,
                     })
                   }
                   className={cn(
