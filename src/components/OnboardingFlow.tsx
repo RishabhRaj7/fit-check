@@ -3,8 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import AnchorInput, { type Anchor } from "@/components/AnchorInput";
-import { CATEGORIES, GENDERS, formatCm, rowPrimaryLabel, type CategoryId } from "@/lib/categories";
+import AnchorInput, { type Anchor, type Lines } from "@/components/AnchorInput";
+import { CATEGORIES, GENDERS, formatCm, rowPrimaryLabel, siblingsOf, type CategoryId } from "@/lib/categories";
 import { isUserCancelled } from "@/lib/firebase/clientAuth";
 import { cn } from "@/lib/format";
 import { saveEntry, setGender, signIn, useProfile } from "@/lib/profile";
@@ -14,20 +14,20 @@ const STEPS: { category: CategoryId; kicker: string; title: string; sub: string 
   {
     category: "sneakers",
     kicker: "Footwear",
-    title: "Your usual sneaker size.",
-    sub: "Pick the brand and size that fits you best — we work out your foot length from their chart. Or measure it; it takes a minute.",
+    title: "A shoe size you trust.",
+    sub: "Sneakers, running shoes, slides or formal — any pair that fits you well. We work out your foot length from that brand's chart, then read it into every other shoe. Or just measure; it takes a minute.",
   },
   {
     category: "tshirt",
     kicker: "Tops",
     title: "A T-shirt that fits you right.",
-    sub: "Any brand. Its size becomes your chest measurement.",
+    sub: "A tee, shirt, hoodie or kurta — any brand. Its size becomes your chest measurement.",
   },
   {
     category: "trousers",
     kicker: "Bottoms",
-    title: "Your trouser waist.",
-    sub: "The waist size on a pair that fits well. Inseam doesn't matter here.",
+    title: "Your waist size.",
+    sub: "Jeans, trousers or shorts that fit well. Inseam doesn't matter here.",
   },
 ];
 
@@ -44,13 +44,20 @@ export default function OnboardingFlow({
   const [saved, setSaved] = useState<CategoryId[]>([]);
   const [signInError, setSignInError] = useState("");
 
+  const linesFor = (c: CategoryId): Lines =>
+    Object.fromEntries(
+      siblingsOf(c)
+        .filter((x) => x !== c)
+        .map((x) => [x, { brands: brands[x], charts: charts[x] }])
+    );
+
   const done = step >= STEPS.length;
   const current = STEPS[Math.min(step, STEPS.length - 1)];
   const pick = picks[current.category] ?? null;
 
   const next = async (keep: boolean) => {
     if (keep && pick) {
-      await saveEntry(current.category, gender, { ...pick, confidence: "exact" });
+      await saveEntry(pick.sourceCategory ?? current.category, gender, { ...pick, confidence: "exact" });
       setSaved((s) => [...s.filter((c) => c !== current.category), current.category]);
     }
     setStep((s) => s + 1);
@@ -118,6 +125,7 @@ export default function OnboardingFlow({
             <div className="lg:col-span-7">
               <div className="border border-bone/12 bg-coal p-5 md:p-7">
                 <AnchorInput
+                  lines={linesFor(current.category)}
                   key={`${current.category}-${gender}`}
                   category={current.category}
                   gender={gender}

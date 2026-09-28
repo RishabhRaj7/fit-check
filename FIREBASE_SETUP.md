@@ -37,10 +37,9 @@ that minute; `/admin` itself always reads live.
 
 ## 2. Auth providers
 
-**Build → Authentication → Sign-in method**, enable:
-
-- **Google** — visitor profiles and `/admin`.
-- **Email/Password** — only for the seed script (Node can't open a popup).
+**Build → Authentication → Sign-in method**, enable **Google** only — it's
+used for visitor profiles and `/admin`. Email/Password isn't needed; leave it
+off.
 
 Add your production domain under **Authentication → Settings → Authorized
 domains**, or Google sign-in will fail there.
@@ -53,32 +52,31 @@ variables.
 
 ## 4. Admin UID → rules → deploy
 
-Sign in once with the account you'll use as admin (on `/admin`, or via the
-seed script), copy its UID from **Authentication → Users**, and put it in
-`firestore.rules`:
+Sign in once on `/admin` with your Google account, copy its UID from
+**Authentication → Users**, and put it in `isAdmin()` in `firestore.rules`
+(it's a list, so more admins can be added later):
 
 ```
-request.auth.uid == "YOUR_UID";
+request.auth.uid in [
+  "YOUR_GOOGLE_ACCOUNT_UID"
+]
 ```
 
-Then deploy rules (and the empty index file):
+Then deploy:
 
 ```bash
-npm i -g firebase-tools
-firebase login
 firebase deploy --only firestore
 ```
 
-## 5. Seed the catalogue (once)
+## 5. Load the catalogue
 
-```bash
-ADMIN_EMAIL=you@example.com ADMIN_PASSWORD='a-strong-password' npm run seed
-```
+`/admin` → **Sync catalogue** → **Preview sync** → **Write N changes**. It
+writes as your Google admin account and upserts the researched brands, charts
+and starter products bundled with the build. Brands and charts edited in
+`/admin` are kept. Run it again whenever a deploy adds catalogue data.
 
-Creates the email/password account on first run, then signs in and writes
-20 brands, 69 charts, 608 rows and the starter products. Re-running clears and
-rewrites. The starter charts are generated from standard conversion steps —
-replace them with each brand's published chart in `/admin` over time.
+`npm run seed` prints the same preview from the command line without writing
+anything.
 
 ## 6. Verify
 
@@ -94,7 +92,7 @@ Signed out, a visitor's sizes live in `localStorage` on that device. On
 sign-in they're merged into `users/{uid}` (newer entry wins) and the device
 copy is cleared, so the next person on a shared device starts clean. The
 rules only let a user write `sizeProfile` and `updatedAt` to their own
-document, with at most 16 entries.
+document, with at most 40 entries.
 
 ## Troubleshooting
 

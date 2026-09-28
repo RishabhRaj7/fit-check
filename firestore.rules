@@ -6,23 +6,28 @@ rules_version = '2';
 // • users/{uid} — one private size profile per account. Only its owner can
 //   read or write it, and only in the shape the app writes.
 //
-// The admin is identified by Firebase Auth UID (stable, unlike an email).
-// Find yours under Authentication → Users, then: firebase deploy --only firestore:rules
+// Admins are identified by Firebase Auth UID (stable, unlike an email).
+// Find UIDs under Authentication → Users, then: firebase deploy --only firestore:rules
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Admin accounts, by Firebase Auth UID. Google sign-in (/admin) and the
+    // seed script's email/password login are separate Firebase users with
+    // different UIDs, so list both. The seed prints its UID when it runs.
     function isAdmin() {
       return request.auth != null
-        && request.auth.uid == "UBcMuGNyIMVLOJ0f9fHY2qrc75v1";
+        && request.auth.uid in [
+          "UBcMuGNyIMVLOJ0f9fHY2qrc75v1"  // admin Google account (/admin)
+        ];
     }
 
     function isOwner(uid) {
       return request.auth != null && request.auth.uid == uid;
     }
 
-    // { sizeProfile: map (≤ 16 anchors), updatedAt: number }
+    // { sizeProfile: map (≤ 40 entries), updatedAt: number }
     function validValues(d) {
-      return (!("sizeProfile" in d) || (d.sizeProfile is map && d.sizeProfile.size() <= 16))
+      return (!("sizeProfile" in d) || (d.sizeProfile is map && d.sizeProfile.size() <= 40))
         && (!("updatedAt" in d) || d.updatedAt is number);
     }
 

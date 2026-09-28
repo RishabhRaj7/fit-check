@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import BrandMark from "@/components/BrandMark";
-import { formatCm, rowPrimaryLabel, type CategoryId } from "@/lib/categories";
+import { CATEGORIES, formatCm, rowPrimaryLabel, type CategoryId } from "@/lib/categories";
 import { cn } from "@/lib/format";
 import { entryFor, useProfile } from "@/lib/profile";
 import { convert, type CategoryCharts, type LiteBrand } from "@/lib/sizing";
@@ -42,7 +42,8 @@ export default function CategoryBrandList({
             Your anchor · <span className="text-bone">{formatCm(saved.entry.anchorValue)} cm</span>{" "}
             {saved.gender !== gender && `(${saved.gender})`}
             {saved.entry.sourceBrandSlug !== "measured" &&
-              ` · via ${saved.entry.sourceBrandName ?? ""} ${saved.entry.sourceSizeLabel}`}{" "}
+              ` · via ${saved.entry.sourceBrandName ?? ""} ${saved.entry.sourceSizeLabel}`}
+            {saved.from !== category && ` (${CATEGORIES[saved.from].nav.toLowerCase()})`}{" "}
             ·{" "}
             <Link href="/profile" className="underline underline-offset-4 hover:text-bone">
               edit

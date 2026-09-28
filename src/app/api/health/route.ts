@@ -5,7 +5,11 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const cat = await getCatalog();
-    return Response.json({ ok: true, dataSource: "firestore", ...stats(cat) });
+    return Response.json({
+      ok: true,
+      dataSource: process.env.CATALOG_SOURCE === "local" ? "local" : "firestore",
+      ...stats(cat),
+    });
   } catch (e) {
     return Response.json(
       { ok: false, error: e instanceof Error ? e.message : "unavailable" },

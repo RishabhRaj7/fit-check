@@ -24,7 +24,15 @@ import {
 import { cn } from "@/lib/format";
 import { convert, type CategoryCharts, type LiteBrand } from "@/lib/sizing";
 
-const CAT = CATEGORIES.sneakers;
+export type HeroLine = "sneakers" | "running";
+
+export interface HeroLineData {
+  /** Brands on the selector (those with charts in this line). */
+  featured: LiteBrand[];
+  /** Every brand in the line — needed for estimates. */
+  brands: LiteBrand[];
+  charts: CategoryCharts;
+}
 const MIN = 23;
 const MAX = 31;
 const SNAP = 0.5;
@@ -39,15 +47,11 @@ const snap = (v: number) => clamp(Math.round(v / SNAP) * SNAP);
  * The hero instrument: pull the tape along the foot; the size re-forms in
  * particles above it, brand after brand. Auto-advances until you touch it.
  */
-export default function Hero({
-  featured,
-  brands,
-  charts,
-}: {
-  featured: LiteBrand[];
-  brands: LiteBrand[];
-  charts: CategoryCharts;
-}) {
+export default function Hero({ lines }: { lines: Partial<Record<HeroLine, HeroLineData>> }) {
+  const available = (["sneakers", "running"] as HeroLine[]).filter((l) => lines[l]?.featured.length);
+  const [line, setLine] = useState<HeroLine>(available[0] ?? "sneakers");
+  const { featured = [], brands = [], charts = {} } = lines[line] ?? {};
+  const CAT = CATEGORIES[line];
   const svgRef = useRef<SVGSVGElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
@@ -68,12 +72,12 @@ export default function Hero({
     setDisplayV(Math.round(clamp((x - ANCHOR_X) / PPC) * 10) / 10);
   });
 
-  const brand = featured[idx] ?? featured[0];
+  const brand = featured[idx % Math.max(1, featured.length)];
   const match = useMemo(
-    () => (brand ? convert(charts, brands, "sneakers", brand.slug, gender, cm) : null),
-    [charts, brands, brand, gender, cm]
+    () => (brand ? convert(charts, brands, line, brand.slug, gender, cm) : null),
+    [charts, brands, brand, gender, cm, line]
   );
-  const primary = match?.row ? rowPrimaryLabel("sneakers", match.row) : "—";
+  const primary = match?.row ? rowPrimaryLabel(line, match.row) : "—";
 
   // Intro: the tape runs out to the reference foot length.
   useEffect(() => {
@@ -181,9 +185,34 @@ export default function Hero({
     <div ref={rootRef} className="border border-bone/12 bg-ink">
       {/* header */}
       <div className="flex items-center justify-between gap-3 border-b border-bone/12 px-4 py-2.5 md:px-6">
-        <span className="kicker text-fog">
-          Readout · <span className="text-bone">{brand.name}</span>
-        </span>
+        <div className="flex items-center gap-3">
+          {available.length > 1 ? (
+            <div className="flex border border-bone/15" role="group" aria-label="Shoe type">
+              {available.map((l) => (
+                <button
+                  key={l}
+                  aria-pressed={line === l}
+                  onClick={() => {
+                    take();
+                    setLine(l);
+                    const keep = lines[l]!.featured.findIndex((b) => b.slug === brand.slug);
+                    setIdx(keep >= 0 ? keep : 0);
+                    setPulse((p) => p + 1);
+                  }}
+                  className={cn(
+                    "kicker px-2.5 py-1 transition-colors",
+                    line === l ? "bg-frost text-ink" : "text-fog hover:text-bone"
+                  )}
+                >
+                  {l === "sneakers" ? "Lifestyle" : "Running"}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          <span className="kicker text-fog">
+            <span className="text-bone">{brand.name}</span>
+          </span>
+        </div>
         <div className="flex items-center gap-4">
           <span className="kicker hidden items-center gap-2 text-frost sm:flex">
             <span

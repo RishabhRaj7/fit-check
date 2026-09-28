@@ -21,13 +21,15 @@ import {
   LogOut,
   Package,
   Plus,
+  RefreshCw,
   Table2,
   Trash2,
   TriangleAlert,
   Upload,
 } from "lucide-react";
 import type { User } from "firebase/auth";
-import { CATEGORY_ORDER, CATEGORIES, isCategory } from "@/lib/categories";
+import { CATEGORY_ORDER, CATEGORIES, FIT_LABEL, FIT_ORDER, isCategory } from "@/lib/categories";
+import { chartDocId } from "@/lib/chartId";
 import { cn, slugify } from "@/lib/format";
 import {
   clientFs,
@@ -56,6 +58,7 @@ export interface AdminChart {
   brandName: string;
   category: string;
   gender: string;
+  fit: string;
   needsData: boolean;
   rowCount: number;
   updatedAt: string;
@@ -95,8 +98,12 @@ interface Ops {
   deleteBrand(slug: string): Promise<void>;
   saveChart(input: {
     brandSlug: string;
+    brandName: string;
     category: string;
     gender: string;
+    fit: string;
+    source: string;
+    sourceUrl: string;
     needsData: boolean;
     rows: {
       anchorValue: number;
@@ -176,12 +183,16 @@ function fsOps(): Ops {
       ]);
     },
     async saveChart(input) {
-      const id = `${input.brandSlug}__${input.category}__${input.gender}`;
+      const id = chartDocId(input.brandSlug, input.category, input.gender, input.fit);
       await setDoc(doc(fs(), "charts", id), {
         brandSlug: input.brandSlug,
-        brandName: "",
+        brandName: input.brandName,
         category: input.category,
         gender: input.gender,
+        fit: input.fit,
+        source: input.source || null,
+        sourceUrl: input.sourceUrl || null,
+        basis: "body",
         needsData: input.needsData,
         updatedBy: "admin",
         updatedAt: new Date().toISOString(),
@@ -258,7 +269,7 @@ export default function AdminApp({
   const [fsReady, setFsReady] = useState<boolean | null>(null);
   const [user, setUser] = useState<User | null>(null);
 
-  const [tab, setTab] = useState<"brands" | "charts" | "products">("brands");
+  const [tab, setTab] = useState<"brands" | "charts" | "products" | "sync">("brands");
   const [brands, setBrands] = useState(initialBrands);
   const [charts, setCharts] = useState(initialCharts);
   const [products, setProducts] = useState(initialProducts);
@@ -420,6 +431,7 @@ export default function AdminApp({
               ["brands", "BRANDS", Database],
               ["charts", "CHARTS", Table2],
               ["products", "PRODUCTS", Package],
+              ["sync", "SYNC CATALOGUE", RefreshCw],
             ] as [typeof tab, string, typeof Database][]
           ).map(([t, label, Icon]) => (
             <button
@@ -462,7 +474,109 @@ export default function AdminApp({
             ops={ops}
           />
         )}
+        {tab === "sync" && <SyncTab />}
       </div>
+    </div>
+  );
+}
+
+/* ================================================================== sync */
+
+type Plan = Awaited<ReturnType<typeof import("@/db/seedPlan").planSeed>>;
+
+/** Writes the researched catalogue (src/db/catalog) as the signed-in admin. */
+function SyncTab() {
+  const [plan, setPlan] = useState<Plan | null>(null);
+  const [state, setState] = useState<"idle" | "planning" | "ready" | "writing" | "done">("idle");
+  const [err, setErr] = useState("");
+
+  const preview = async () => {
+    setErr("");
+    setState("planning");
+    try {
+      const { planSeed } = await import("@/db/seedPlan");
+      setPlan(await planSeed(clientFs()!));
+      setState("ready");
+    } catch (e) {
+      setErr(errMsg(e));
+      setState("idle");
+    }
+  };
+
+  const apply = async () => {
+    if (!plan) return;
+    setErr("");
+    setState("writing");
+    try {
+      await plan.commit();
+      setState("done");
+    } catch (e) {
+      setErr(errMsg(e));
+      setState("ready");
+    }
+  };
+
+  const busy = state === "planning" || state === "writing";
+
+  return (
+    <div className="max-w-2xl border border-bone/12 bg-coal p-6 md:p-8">
+      <p className="kicker text-fog">Researched catalogue → Firestore</p>
+      <p className="mt-4 text-sm leading-relaxed text-fog">
+        Upserts every brand, researched chart and starter product bundled with
+        this build. Charts saved here in the deck are never overwritten; charts
+        from earlier seeds that are no longer in the catalogue are removed.
+        Safe to run again after each deploy.
+      </p>
+
+      {plan && (
+        <dl className="mt-6 grid grid-cols-2 border-t border-l border-bone/12 font-mono text-xs md:grid-cols-4">
+          {(
+            [
+              ["Brands", plan.brands],
+              ["Charts", plan.charts],
+              ["Stale charts", plan.staleCharts],
+              ["Writes", plan.writes],
+            ] as const
+          ).map(([k, v]) => (
+            <div key={k} className="border-r border-b border-bone/12 p-3">
+              <dt className="text-[9px] tracking-[0.16em] text-fog uppercase">{k}</dt>
+              <dd className="mt-1 text-lg text-bone">{v}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {plan && plan.log.length > 0 && state !== "done" && (
+        <pre className="mt-4 max-h-48 overflow-auto border border-bone/12 bg-ink p-3 font-mono text-[10px] leading-relaxed text-fog">
+          {plan.log.join("\n")}
+        </pre>
+      )}
+
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        {state !== "done" && (
+          <button
+            onClick={() => void (state === "ready" ? apply() : preview())}
+            disabled={busy}
+            className="kicker flex items-center gap-2 bg-signal px-4 py-3 text-bone transition-colors hover:bg-bone hover:text-ink disabled:opacity-50"
+          >
+            {busy ? <Loader2 size={13} className="animate-spin" /> : state === "ready" ? <Upload size={13} /> : <RefreshCw size={13} />}
+            {state === "ready" ? `Write ${plan?.writes ?? ""} changes` : "Preview sync"}
+          </button>
+        )}
+        {state === "done" && (
+          <>
+            <span className="flex items-center gap-2 font-mono text-xs text-frost">
+              <Check size={14} /> Catalogue synced. The public site picks it up within a minute.
+            </span>
+            <button
+              onClick={() => window.location.reload()}
+              className="kicker border border-bone/20 px-4 py-3 text-fog transition-colors hover:text-bone"
+            >
+              Reload deck
+            </button>
+          </>
+        )}
+      </div>
+      {err && <p className="mt-3 font-mono text-xs text-frost">{err}</p>}
     </div>
   );
 }
@@ -559,6 +673,9 @@ function ChartsTab({
   const [brandSlug, setBrandSlug] = useState<string>(brands[0]?.slug ?? "");
   const [category, setCategory] = useState<string>("sneakers");
   const [gender, setGender] = useState<string>("men");
+  const [fit, setFit] = useState<string>("regular");
+  const [source, setSource] = useState("");
+  const [sourceUrl, setSourceUrl] = useState("");
   const [rows, setRows] = useState<EditRow[]>([]);
   const [needsData, setNeedsData] = useState(false);
   const [csv, setCsv] = useState("");
@@ -572,9 +689,16 @@ function ChartsTab({
     setLoading(true);
     setMsg("");
     const snap = await getDoc(
-      doc(clientFs()!, "charts", `${brand.slug}__${category}__${gender}`)
+      doc(clientFs()!, "charts", chartDocId(brand.slug, category, gender, fit))
     );
-    const d = (snap.data() ?? {}) as { rows?: Record<string, unknown>[]; needsData?: boolean };
+    const d = (snap.data() ?? {}) as {
+      rows?: Record<string, unknown>[];
+      needsData?: boolean;
+      source?: string;
+      sourceUrl?: string;
+    };
+    setSource(d.source ?? "");
+    setSourceUrl(d.sourceUrl ?? "");
     setRows(
       [...(d.rows ?? [])]
         .sort((x, y) => Number(x.anchorValue) - Number(y.anchorValue))
@@ -611,8 +735,12 @@ function ChartsTab({
         .filter((r) => Number.isFinite(Number(r.anchorValue)));
       const d = await ops.saveChart({
         brandSlug,
+        brandName: brand?.name ?? brandSlug,
         category,
         gender,
+        fit,
+        source,
+        sourceUrl,
         needsData,
         rows: payload,
       });
@@ -623,7 +751,8 @@ function ChartsTab({
             (c) =>
               c.brandSlug === brandSlug &&
               c.category === category &&
-              c.gender === gender
+              c.gender === gender &&
+              c.fit === fit
           );
           if (idx >= 0) {
             const next = [...prev];
@@ -643,6 +772,7 @@ function ChartsTab({
               brandName: brand.name,
               category,
               gender,
+              fit,
               needsData,
               rowCount: d.rowCount,
               updatedAt: new Date().toISOString(),
@@ -706,6 +836,20 @@ function ChartsTab({
               </button>
             ))}
           </div>
+          <label className="mt-4 mb-1.5 block font-mono text-[9px] tracking-[0.2em] text-fog">
+            FIT
+          </label>
+          <select
+            value={fit}
+            onChange={(e) => setFit(e.target.value)}
+            className="w-full appearance-none border border-bone/20 bg-ink px-3 py-2.5 font-mono text-xs text-bone uppercase outline-none focus:border-frost"
+          >
+            {FIT_ORDER.map((f) => (
+              <option key={f} value={f}>
+                {FIT_LABEL[f]}
+              </option>
+            ))}
+          </select>
           <button
             onClick={load}
             disabled={loading || !brand}
@@ -724,12 +868,14 @@ function ChartsTab({
                 setBrandSlug(c.brandSlug);
                 setCategory(c.category);
                 setGender(c.gender);
+                setFit(c.fit);
               }}
               className={cn(
                 "flex w-full items-center justify-between gap-2 border-b border-bone/10 px-3 py-2.5 text-left transition-colors hover:bg-coal",
                 c.brandSlug === brandSlug &&
                   c.category === category &&
-                  c.gender === gender
+                  c.gender === gender &&
+                  c.fit === fit
                   ? "bg-coal"
                   : "bg-ink"
               )}
@@ -743,6 +889,7 @@ function ChartsTab({
                     ? CATEGORIES[c.category as keyof typeof CATEGORIES].nav
                     : c.category}{" "}
                   · {c.gender}
+                  {c.fit !== "regular" && ` · ${c.fit}`}
                 </span>
               </span>
               <span
@@ -782,6 +929,20 @@ function ChartsTab({
           >
             <Check size={11} strokeWidth={2.4} /> Save chart
           </button>
+        </div>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          <input
+            value={source}
+            onChange={(e) => setSource(e.target.value)}
+            placeholder="Source label (e.g. nike.com size chart)"
+            className="border border-bone/15 bg-ink px-3 py-2 text-sm text-bone outline-none focus:border-frost"
+          />
+          <input
+            value={sourceUrl}
+            onChange={(e) => setSourceUrl(e.target.value)}
+            placeholder="Source URL"
+            className="border border-bone/15 bg-ink px-3 py-2 font-mono text-xs text-bone outline-none focus:border-frost"
+          />
         </div>
         {msg && (
           <p className="mt-2 font-mono text-[11px] tracking-[0.14em] text-frost">{msg}</p>
