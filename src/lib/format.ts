@@ -4,12 +4,7 @@ export function cn(...parts: Array<string | false | null | undefined>): string {
 
 export function inr(n?: number | null): string | null {
   if (n == null) return null;
-  return "\u20B9" + n.toLocaleString("en-IN");
-}
-
-export function formatAnchor(value: number, unit: string): string {
-  const v = Math.round(value * 10) / 10;
-  return `${v} ${unit.toLowerCase()}`;
+  return "₹" + n.toLocaleString("en-IN");
 }
 
 export function slugify(name: string): string {

@@ -11,7 +11,7 @@ const FROST = "#8cb8dd";
  * forefoot flare with big-toe bulge, rounded toe cap. No self-intersection;
  * reads as a foot, not a figure. Draws itself in ~0.6s after mount.
  */
-export default function FootOutline({ scale }: { scale?: any }) {
+export default function FootOutline() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 60);
@@ -19,7 +19,7 @@ export default function FootOutline({ scale }: { scale?: any }) {
   }, []);
 
   return (
-    <motion.g style={{ scale, transformOrigin: "320px 300px" }}>
+    <g>
       {/* insole outline */}
       <motion.path
         d="M 86 305
@@ -72,7 +72,7 @@ export default function FootOutline({ scale }: { scale?: any }) {
         />
         <line x1={422} y1={204} x2={438} y2={204} stroke={BONE} strokeOpacity={0.4} />
         <line x1={422} y1={390} x2={438} y2={390} stroke={BONE} strokeOpacity={0.4} />
-        <text
+        <text fontFamily="var(--font-plex-mono)"
           x={444}
           y={208}
           fontSize={7.5}
@@ -109,7 +109,7 @@ export default function FootOutline({ scale }: { scale?: any }) {
         <line x1={556} y1={428} x2={556} y2={444} stroke={BONE} strokeOpacity={0.4} />
         <path d="M 96 432 L 86 436 L 96 440" fill="none" stroke={BONE} strokeOpacity={0.4} />
         <path d="M 546 432 L 556 436 L 546 440" fill="none" stroke={BONE} strokeOpacity={0.4} />
-        <text
+        <text fontFamily="var(--font-plex-mono)"
           x={321}
           y={452}
           fontSize={7.5}
@@ -120,17 +120,10 @@ export default function FootOutline({ scale }: { scale?: any }) {
         >
           AXIS — HEEL → TOE
         </text>
-
-        <text x={84} y={474} fontSize={8} letterSpacing={3} fill={BONE} fillOpacity={0.45}>
-          FIG. 01 — TOP-DOWN INSOLE
-        </text>
-        <text x={84} y={490} fontSize={8} letterSpacing={3} fill={BONE} fillOpacity={0.3}>
-          SCALE 1:1 · 16 UNITS / CM
-        </text>
-        <text x={84} y={214} fontSize={8} letterSpacing={3} fill={FROST} fillOpacity={0.55}>
+        <text fontFamily="var(--font-plex-mono)" x={84} y={214} fontSize={8} letterSpacing={3} fill={FROST} fillOpacity={0.55}>
           FOOT LENGTH
         </text>
       </motion.g>
-    </motion.g>
+    </g>
   );
 }

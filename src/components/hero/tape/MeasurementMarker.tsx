@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, type MotionValue } from "framer-motion";
-import type { PointerEvent as ReactPointerEvent } from "react";
+import type { KeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
 import { TAPE_Y } from "./TapeMeasure";
 
 const FROST = "#8cb8dd";
@@ -19,6 +19,10 @@ export default function MeasurementMarker({
   onDown,
   onMove,
   onUp,
+  onKeyDown,
+  valueNow,
+  min,
+  max,
 }: {
   x: MotionValue<number>;
   value: string;
@@ -26,6 +30,10 @@ export default function MeasurementMarker({
   onDown: (e: ReactPointerEvent<SVGRectElement>) => void;
   onMove: (e: ReactPointerEvent<SVGRectElement>) => void;
   onUp: (e: ReactPointerEvent<SVGRectElement>) => void;
+  onKeyDown: (e: KeyboardEvent<SVGRectElement>) => void;
+  valueNow: number;
+  min: number;
+  max: number;
 }) {
   return (
     <motion.g style={{ x }} cursor={engaged ? "grabbing" : "grab"}>
@@ -51,6 +59,7 @@ export default function MeasurementMarker({
         strokeOpacity={0.6}
       />
       <text
+        fontFamily="var(--font-plex-mono)"
         x={0}
         y={TAPE_Y - 53.5}
         fontSize={9.5}
@@ -107,6 +116,14 @@ export default function MeasurementMarker({
         height={120}
         fill="transparent"
         style={{ touchAction: "none" }}
+        tabIndex={0}
+        role="slider"
+        aria-label="Foot length in centimetres — drag the tape or use the arrow keys"
+        aria-valuemin={min}
+        aria-valuemax={max}
+        aria-valuenow={valueNow}
+        aria-valuetext={`${valueNow} cm`}
+        onKeyDown={onKeyDown}
         onPointerDown={onDown}
         onPointerMove={onMove}
         onPointerUp={onUp}

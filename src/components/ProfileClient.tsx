@@ -1,281 +1,253 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
-import type { User } from "firebase/auth";
+import AnchorInput, { type Anchor } from "@/components/AnchorInput";
+import SizePassport from "@/components/SizePassport";
 import {
-  ArrowUpRight,
-  CloudUpload,
-  Loader2,
-  LogOut,
-  Pencil,
-  Ruler,
-  Trash2,
-  X,
-} from "lucide-react";
-import { CATEGORIES, isCategory, type CategoryId } from "@/lib/categories";
+  CATEGORY_ORDER,
+  CATEGORIES,
+  GENDERS,
+  formatCm,
+  type CategoryId,
+} from "@/lib/categories";
+import { isUserCancelled } from "@/lib/firebase/clientAuth";
 import { cn } from "@/lib/format";
-import { loadProfile, removeEntry, saveEntry, type Profile } from "@/lib/profile";
 import {
-  initClientFirebase,
-  onAuthChange,
-  signInGoogle,
-  signOutUser,
-} from "@/lib/firebase/clientAuth";
-import KnownSizePicker, {
-  type LiteBrand,
-  type PickedSize,
-} from "@/components/KnownSizePicker";
+  entryKey,
+  removeEntry,
+  saveEntry,
+  setGender,
+  signIn,
+  signOut,
+  useProfile,
+} from "@/lib/profile";
+import type { CategoryCharts, LiteBrand } from "@/lib/sizing";
 
-export default function ProfileClient({
-  brandSets,
-}: {
-  brandSets: Record<CategoryId, LiteBrand[]>;
-}) {
-  const [profile, setProfile] = useState<Profile>({});
-  const [editing, setEditing] = useState<string | null>(null);
-  const [loaded, setLoaded] = useState(false);
-  const [configured, setConfigured] = useState<boolean | null>(null);
-  const [user, setUser] = useState<User | null>(null);
-  const [gateBusy, setGateBusy] = useState(false);
+function SyncPanel() {
+  const { user, syncAvailable, ready } = useProfile();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
-  const reload = () => {
-    void loadProfile().then((p) => {
-      setProfile(p);
-      setLoaded(true);
-    });
-  };
-
-  useEffect(() => {
-    let unsub: (() => void) | undefined;
-    initClientFirebase().then((ok) => {
-      setConfigured(ok);
-      if (ok) {
-        unsub = onAuthChange((u) => {
-          setUser(u);
-          reload();
-        });
-        return;
-      }
-      reload();
-    });
-    return () => unsub?.();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const onPick = (gender: string, cat: CategoryId) => async (v: PickedSize) => {
-    await saveEntry(cat, gender, {
-      anchorValue: v.anchorValue,
-      sourceBrandSlug: v.slug,
-      sourceBrandName: v.name,
-      sourceSizeLabel: v.label,
-      confidence: "exact",
-    });
-    reload();
-    setEditing(null);
-  };
-
-  if (!loaded || configured === null) {
-    return (
-      <div className="flex min-h-56 items-center justify-center">
-        <Loader2 className="animate-spin text-frost" size={20} />
-      </div>
-    );
-  }
-
-  /* -------- Firebase configured but signed out → sign-in gate -------- */
-  if (configured && !user) {
-    return (
-      <div className="mx-auto max-w-md border border-bone/12 bg-coal p-8">
-        <div className="flex items-center gap-3">
-          <CloudUpload size={18} className="text-frost" strokeWidth={1.8} />
-          <span className="font-mono text-[10px] tracking-[0.24em] text-fog">
-            PROFILE — SYNCED VIA FIREBASE
-          </span>
-        </div>
-        <h2 className="mt-4 font-display text-4xl tracking-tight text-bone">
-          SIGN IN TO SYNC<span className="text-frost">.</span>
-        </h2>
-        <p className="mt-4 text-sm leading-relaxed text-fog">
-          Your saved sizes live on your account — any device, every visit.
-          Sizes already measured on this device are merged up on first
-          sign-in.
-        </p>
-        <button
-          disabled={gateBusy}
-          onClick={() => {
-            setGateBusy(true);
-            signInGoogle().catch(() => setGateBusy(false));
-          }}
-          className="mt-6 flex w-full items-center justify-center gap-2 bg-signal px-4 py-3 font-mono text-[11px] font-semibold tracking-[0.2em] text-bone uppercase transition-colors hover:bg-frost hover:text-ink disabled:opacity-40"
-        >
-          {gateBusy ? (
-            <Loader2 size={13} className="animate-spin" />
-          ) : (
-            <CloudUpload size={13} strokeWidth={2.2} />
-          )}
-          Sign in with Google
-        </button>
-        <p className="mt-4 font-mono text-[10px] leading-relaxed tracking-[0.12em] text-fog">
-          ONLY YOUR SIZE PROFILE IS STORED — READABLE AND WRITABLE BY YOU
-          ALONE.
-        </p>
-      </div>
-    );
-  }
-
-  const keys = Object.keys(profile).sort();
-  const allCategories = Object.keys(brandSets) as CategoryId[];
-  const missing = allCategories.filter(
-    (c) => !keys.some((k) => k.startsWith(`${c}:`))
-  );
+  if (!ready) return <div className="h-24 border border-bone/12" aria-busy="true" />;
 
   return (
-    <div>
-      {/* sync status */}
-      <div className="mb-6 flex flex-wrap items-center gap-3">
-        {user ? (
-          <>
-            <span className="flex items-center gap-2 border border-frost/40 px-3 py-1.5 font-mono text-[10px] tracking-[0.18em] text-frost uppercase">
-              <CloudUpload size={11} /> Synced — {user.email}
-            </span>
+    <div className="flex flex-col justify-between gap-5 border border-bone/12 p-5 md:flex-row md:items-center md:p-6">
+      <div className="flex items-start gap-4">
+        <span
+          className={cn("mt-1.5 inline-block h-2 w-2 shrink-0", user ? "bg-signal" : "border border-bone/40")}
+          aria-hidden="true"
+        />
+        <div>
+          <p className="text-base text-bone">
+            {user ? `Synced to ${user.email ?? "your Google account"}` : "Kept on this device only"}
+          </p>
+          <p className="mt-1 max-w-xl text-sm leading-relaxed text-fog">
+            {user
+              ? "Your sizes follow you to any device you sign in on. Only you can read them."
+              : syncAvailable
+                ? "Sign in with Google to keep your sizes on every device. Anything saved here moves over automatically."
+                : "Clearing your browser data clears these sizes."}
+          </p>
+          {error && <p className="mt-2 text-sm text-frost">{error}</p>}
+        </div>
+      </div>
+      {syncAvailable && (
+        <button
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            setError("");
+            try {
+              await (user ? signOut() : signIn());
+            } catch (e) {
+              if (!isUserCancelled(e)) setError("Sign-in didn't complete. Please try again.");
+            } finally {
+              setBusy(false);
+            }
+          }}
+          className={cn(
+            "kicker flex h-11 shrink-0 items-center justify-center px-5 transition-colors disabled:opacity-40",
+            user ? "border border-bone/20 text-fog hover:text-bone" : "bg-signal text-bone hover:bg-bone hover:text-ink"
+          )}
+        >
+          {busy ? "One moment…" : user ? "Sign out" : "Sign in with Google"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+export default function ProfileClient({
+  charts,
+  brands,
+}: {
+  charts: Record<CategoryId, CategoryCharts>;
+  brands: Record<CategoryId, LiteBrand[]>;
+}) {
+  const { profile, gender, ready } = useProfile();
+  const [editing, setEditing] = useState<CategoryId | null>(null);
+  const [draft, setDraft] = useState<Anchor | null>(null);
+
+  const otherGender = gender === "men" ? "women" : "men";
+  const otherCount = CATEGORY_ORDER.filter((c) => profile[entryKey(c, otherGender)]).length;
+
+  const startEdit = (c: CategoryId) => {
+    setEditing(c);
+    setDraft(profile[entryKey(c, gender)] ?? null);
+  };
+
+  const commit = async (c: CategoryId) => {
+    if (!draft) return;
+    await saveEntry(c, gender, { ...draft, confidence: "exact" });
+    setEditing(null);
+    setDraft(null);
+  };
+
+  return (
+    <div className="space-y-10">
+      <SyncPanel />
+
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex border border-bone/15" role="group" aria-label="Sizes for">
+          {GENDERS.map((g) => (
             <button
-              onClick={() => void signOutUser()}
-              className="flex items-center gap-1.5 font-mono text-[10px] tracking-[0.18em] text-fog uppercase transition-colors hover:text-bone"
+              key={g.id}
+              aria-pressed={gender === g.id}
+              onClick={() => {
+                setGender(g.id);
+                setEditing(null);
+              }}
+              className={cn(
+                "kicker px-4 py-2 transition-colors",
+                gender === g.id ? "bg-bone text-ink" : "text-fog hover:text-bone"
+              )}
             >
-              <LogOut size={11} /> Sign out
+              {g.label}
             </button>
-          </>
-        ) : (
-          <span className="border border-bone/20 px-3 py-1.5 font-mono text-[10px] tracking-[0.18em] text-fog uppercase">
-            Stored on this device
-          </span>
+          ))}
+        </div>
+        {otherCount > 0 && (
+          <p className="kicker text-fog">
+            {otherCount} saved under {otherGender}
+          </p>
         )}
       </div>
 
-      {keys.length === 0 ? (
-        <div className="border border-dashed border-bone/20 p-10 text-center md:p-16">
-          <Ruler size={20} className="mx-auto text-frost" strokeWidth={1.8} />
-          <h2 className="mt-4 font-display text-4xl tracking-tight text-bone md:text-6xl">
-            NOTHING ANCHORED YET<span className="text-frost">.</span>
-          </h2>
-          <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-fog">
-            Tell us one size you trust and every brand page converts for you
-            instantly. Takes about twenty seconds.
-          </p>
-          <Link
-            href="/onboarding"
-            className="mt-6 inline-flex items-center gap-2 bg-signal px-6 py-3.5 font-mono text-[11px] font-semibold tracking-[0.2em] text-bone uppercase transition-colors hover:bg-frost hover:text-ink"
-          >
-            Start onboarding <ArrowUpRight size={14} strokeWidth={2.4} />
-          </Link>
-        </div>
-      ) : (
-        <div className="grid gap-px border border-bone/12 bg-bone/12 md:grid-cols-2">
-          {keys.map((key, i) => {
-            const [catId, gender] = key.split(":");
-            const entry = profile[key];
-            const cat = isCategory(catId) ? CATEGORIES[catId] : null;
-            const isEditing = editing === key;
-            return (
-              <motion.div
-                key={key}
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
-                className="bg-ink p-6"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <span className="font-mono text-[10px] tracking-[0.22em] text-fog">
-                      {cat?.nav ?? catId.toUpperCase()} · {gender.toUpperCase()}
-                    </span>
-                    <p className="mt-2 font-display text-5xl leading-none text-bone">
-                      {Math.round(entry.anchorValue * 10) / 10}
-                      <span className="text-frost">
-                        {" "}
-                        {cat?.anchorUnit ?? "CM"}
-                      </span>
-                    </p>
-                    <p className="mt-2 font-mono text-[10px] tracking-[0.14em] text-fog">
-                      {cat?.anchorLabel ?? "ANCHOR"} — VIA{" "}
-                      {entry.sourceBrandSlug === "measured"
-                        ? "SELF-MEASURED"
-                        : `${(entry.sourceBrandName ?? entry.sourceBrandSlug).toUpperCase()} ${entry.sourceSizeLabel}`}
-                    </p>
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <span
-                      className={cn(
-                        "px-2 py-1 font-mono text-[9px] tracking-[0.2em]",
-                        entry.confidence === "exact"
-                          ? "bg-bone text-ink"
-                          : "border border-frost text-frost"
+      <div className="border-t border-bone/12">
+        {CATEGORY_ORDER.map((c, i) => {
+          const def = CATEGORIES[c];
+          const entry = profile[entryKey(c, gender)];
+          const isEditing = editing === c;
+          return (
+            <section key={c} aria-labelledby={`cat-${c}`} className="border-b border-bone/12 py-8 md:py-10">
+              <div className="grid gap-6 md:grid-cols-12">
+                <div className="md:col-span-4">
+                  <p className="kicker text-fog">
+                    <span className="text-frost">0{i + 1}</span> — {def.anchor}
+                  </p>
+                  <h2 id={`cat-${c}`} className="mt-3 font-display text-3xl font-light tracking-[-0.02em] text-bone">
+                    {def.label}
+                  </h2>
+                  {!ready ? (
+                    <div className="mt-4 h-12 w-40 bg-coal" aria-busy="true" />
+                  ) : entry ? (
+                    <>
+                      <p className="mt-4 font-display text-5xl font-light tabular text-bone">
+                        {formatCm(entry.anchorValue)}
+                        <span className="ml-2 font-mono text-sm text-fog">cm</span>
+                      </p>
+                      <p className="kicker mt-2 text-fog">
+                        {entry.sourceBrandSlug === "measured"
+                          ? "Measured"
+                          : `Via ${entry.sourceBrandName ?? entry.sourceBrandSlug} ${entry.sourceSizeLabel}`}
+                        {" · "}
+                        {new Date(entry.updatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="mt-4 text-sm text-fog">Not set yet.</p>
+                  )}
+                  {ready && !isEditing && (
+                    <div className="mt-5 flex gap-2">
+                      <button
+                        onClick={() => startEdit(c)}
+                        className={cn(
+                          "kicker flex h-9 items-center px-4 transition-colors",
+                          entry ? "border border-bone/20 text-bone hover:border-bone/60" : "bg-signal text-bone hover:bg-bone hover:text-ink"
+                        )}
+                      >
+                        {entry ? "Change" : "Set my size"}
+                      </button>
+                      {entry && (
+                        <button
+                          onClick={() => void removeEntry(entryKey(c, gender))}
+                          className="kicker flex h-9 items-center px-3 text-fog transition-colors hover:text-bone"
+                        >
+                          Remove
+                        </button>
                       )}
-                    >
-                      {entry.confidence === "exact" ? "EXACT" : "INFERRED"}
-                    </span>
-                    <div className="flex gap-1.5">
-                      <button
-                        aria-label="Edit"
-                        onClick={() => setEditing(isEditing ? null : key)}
-                        className="flex h-8 w-8 items-center justify-center border border-bone/15 text-fog transition-colors hover:border-frost hover:text-frost"
-                      >
-                        {isEditing ? <X size={13} /> : <Pencil size={13} />}
-                      </button>
-                      <button
-                        aria-label="Remove"
-                        onClick={() => {
-                          void removeEntry(key).then(reload);
-                        }}
-                        className="flex h-8 w-8 items-center justify-center border border-bone/15 text-fog transition-colors hover:border-frost hover:text-frost"
-                      >
-                        <Trash2 size={13} />
-                      </button>
                     </div>
-                  </div>
+                  )}
                 </div>
 
-                {isEditing && isCategory(catId) && (
-                  <div className="mt-5 border-t border-bone/12 pt-5">
-                    <KnownSizePicker
-                      category={catId}
-                      gender={gender === "women" ? "women" : "men"}
-                      brands={brandSets[catId]}
-                      value={null}
-                      onChange={onPick(gender, catId)}
+                <div className="md:col-span-8">
+                  {isEditing ? (
+                    <div className="border border-bone/12 bg-coal p-5 md:p-6">
+                      <AnchorInput
+                        category={c}
+                        gender={gender}
+                        brands={brands[c]}
+                        charts={charts[c]}
+                        value={draft}
+                        onChange={setDraft}
+                      />
+                      <div className="mt-6 flex gap-2">
+                        <button
+                          disabled={!draft}
+                          onClick={() => void commit(c)}
+                          className="kicker flex h-10 items-center bg-signal px-5 text-bone transition-colors hover:bg-bone hover:text-ink disabled:opacity-30"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={() => setEditing(null)}
+                          className="kicker flex h-10 items-center px-4 text-fog transition-colors hover:text-bone"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : entry ? (
+                    <SizePassport
+                      category={c}
+                      gender={gender}
+                      anchor={entry.anchorValue}
+                      brands={brands[c]}
+                      charts={charts[c]}
                     />
-                  </div>
-                )}
-              </motion.div>
-            );
-          })}
-        </div>
-      )}
+                  ) : (
+                    <div className="flex h-full min-h-32 items-center border border-dashed border-bone/12 p-6">
+                      <p className="max-w-md text-sm leading-relaxed text-fog">
+                        Set your {def.anchor.toLowerCase()} once and you&apos;ll see your size in all{" "}
+                        {brands[c].length} {def.label.toLowerCase()} brands here.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </section>
+          );
+        })}
+      </div>
 
-      {missing.length > 0 && keys.length > 0 && (
-        <div className="mt-8 border border-bone/12 bg-coal p-6">
-          <span className="font-mono text-[10px] tracking-[0.22em] text-fog">
-            NOT ANCHORED YET
-          </span>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {missing.map((c) => (
-              <Link
-                key={c}
-                href={`/category/${c}`}
-                className="group flex items-center gap-2 border border-bone/20 px-4 py-2.5 font-mono text-[10px] tracking-[0.18em] text-bone uppercase transition-colors hover:border-frost hover:text-frost"
-              >
-                {CATEGORIES[c].label}
-                <ArrowUpRight
-                  size={12}
-                  className="transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
-                />
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
+      <p className="text-sm text-fog">
+        New here?{" "}
+        <Link href="/onboarding" className="text-bone underline underline-offset-4 hover:text-frost">
+          The 30-second setup
+        </Link>{" "}
+        covers sneakers, tops and trousers in one go.
+      </p>
     </div>
   );
 }

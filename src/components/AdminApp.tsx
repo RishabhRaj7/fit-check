@@ -33,6 +33,7 @@ import {
   clientFs,
   initClientFirebase,
   isPermissionDenied,
+  isUserCancelled,
   onAuthChange,
   signInGoogle,
   signOutUser,
@@ -69,8 +70,6 @@ export interface AdminProduct {
   name: string;
   priceInr: number | null;
 }
-
-type AdminMode = "postgres" | "firestore";
 
 interface EditRow {
   anchorValue: string;
@@ -120,46 +119,12 @@ interface Ops {
 
 function errMsg(e: unknown): string {
   if (isPermissionDenied(e)) {
-    return "WRITE DENIED — this account is not the admin email in firestore.rules.";
+    return "Write denied — this account is not the admin UID in firestore.rules.";
   }
   return e instanceof Error ? e.message : "Operation failed";
 }
 
-/** Postgres fallback mode — mutations via the key-gated API. */
-function pgOps(
-  call: (path: string, init?: RequestInit) => Promise<any>
-): Ops {
-  return {
-    createBrand: (input) => call("/api/admin/brands", {
-      method: "POST",
-      body: JSON.stringify(input),
-    }),
-    updateBrand: (slug, patch) =>
-      call(`/api/admin/brands/${slug}`, {
-        method: "PATCH",
-        body: JSON.stringify(patch),
-      }).then((d) => d.brand ?? null),
-    deleteBrand: (slug) =>
-      call(`/api/admin/brands/${slug}`, { method: "DELETE" }).then(() => {}),
-    saveChart: (input) =>
-      call("/api/admin/charts", {
-        method: "PUT",
-        body: JSON.stringify(input),
-      }).then((d) => {
-        if (d.error) throw new Error(d.error);
-        return { chartId: String(d.chartId), rowCount: d.rowCount };
-      }),
-    addProduct: (input) =>
-      call("/api/admin/products", {
-        method: "POST",
-        body: JSON.stringify(input),
-      }).then((d) => d.product),
-    deleteProduct: (id) =>
-      call(`/api/admin/products/${id}`, { method: "DELETE" }).then(() => {}),
-  };
-}
-
-/** Firestore mode — authenticated writes straight from the browser. */
+/** Authenticated writes straight from the browser; firestore.rules enforce the admin UID. */
 function fsOps(): Ops {
   const fs = () => clientFs()!;
   return {
@@ -175,7 +140,7 @@ function fsOps(): Ops {
         id: slug,
         slug,
         name,
-        logoUrl: input.logoUrl || `/brands/${slug}/logo.png`,
+        logoUrl: input.logoUrl || null,
         categories: input.categories,
         priority: input.priority ?? 0,
         needsData: false,
@@ -279,28 +244,18 @@ function parseCsv(text: string): EditRow[] {
   return out;
 }
 
-const KEY_STORE = "sh_admin_key";
-
 export default function AdminApp({
-  mode,
   brands: initialBrands,
   charts: initialCharts,
   products: initialProducts,
 }: {
-  mode: AdminMode;
   brands: AdminBrand[];
   charts: AdminChart[];
   products: AdminProduct[];
 }) {
-  /* ---------------- auth / gate state ---------------- */
-  const [key, setKey] = useState<string | null>(null);
   const [checking, setChecking] = useState(true);
-  const [keyInput, setKeyInput] = useState("");
   const [gateError, setGateError] = useState("");
-
-  const [fsReady, setFsReady] = useState<boolean | null>(
-    mode === "firestore" ? null : false
-  );
+  const [fsReady, setFsReady] = useState<boolean | null>(null);
   const [user, setUser] = useState<User | null>(null);
 
   const [tab, setTab] = useState<"brands" | "charts" | "products">("brands");
@@ -308,40 +263,9 @@ export default function AdminApp({
   const [charts, setCharts] = useState(initialCharts);
   const [products, setProducts] = useState(initialProducts);
 
-  const call = async (path: string, init?: RequestInit) => {
-    const res = await fetch(path, {
-      ...init,
-      headers: {
-        "Content-Type": "application/json",
-        "x-admin-key": key ?? "",
-        ...(init?.headers ?? {}),
-      },
-    });
-    if (res.status === 401) {
-      setKey(null);
-      sessionStorage.removeItem(KEY_STORE);
-      throw new Error("unauthorized");
-    }
-    return res.json();
-  };
-
-  const ops: Ops = mode === "postgres" ? pgOps(call) : fsOps();
+  const ops: Ops = fsOps();
 
   useEffect(() => {
-    if (mode === "postgres") {
-      const stored = sessionStorage.getItem(KEY_STORE);
-      if (!stored) {
-        setChecking(false);
-        return;
-      }
-      fetch("/api/admin/ping", { headers: { "x-admin-key": stored } })
-        .then((r) => {
-          if (r.ok) setKey(stored);
-          else sessionStorage.removeItem(KEY_STORE);
-        })
-        .finally(() => setChecking(false));
-      return;
-    }
     let unsub: (() => void) | undefined;
     initClientFirebase().then((ok) => {
       setFsReady(ok);
@@ -349,25 +273,10 @@ export default function AdminApp({
       setChecking(false);
     });
     return () => unsub?.();
-  }, [mode]);
-
-  const tryKey = async () => {
-    setGateError("");
-    const res = await fetch("/api/admin/ping", {
-      headers: { "x-admin-key": keyInput.trim() },
-    });
-    if (res.ok) {
-      sessionStorage.setItem(KEY_STORE, keyInput.trim());
-      setKey(keyInput.trim());
-    } else {
-      setGateError("Wrong key.");
-    }
-  };
-
-  const authorized = mode === "postgres" ? !!key : !!user;
+  }, []);
 
   /* ------------------------------------------------------------- gate */
-  if (checking || (mode === "firestore" && fsReady === null)) {
+  if (checking || fsReady === null) {
     return (
       <div className="flex min-h-64 items-center justify-center">
         <Loader2 className="animate-spin text-frost" size={22} />
@@ -375,78 +284,38 @@ export default function AdminApp({
     );
   }
 
-  if (!authorized) {
-    if (mode === "firestore") {
-      return (
-        <div className="mx-auto max-w-md border border-bone/12 bg-coal p-8">
-          <div className="flex items-center gap-3">
-            <KeyRound size={18} className="text-frost" strokeWidth={1.8} />
-            <span className="font-mono text-[10px] tracking-[0.24em] text-fog">
-              CONTROL DECK — FIRESTORE MODE
-            </span>
-          </div>
-          <h2 className="mt-4 font-display text-4xl tracking-tight text-bone">
-            ADMIN SIGN-IN<span className="text-frost">.</span>
-          </h2>
-          {fsReady === false ? (
-            <p className="mt-6 font-mono text-xs leading-relaxed text-frost">
-              Firebase web config not found. Set the six FIREBASE_* env vars,
-              restart, then reload.
-            </p>
-          ) : (
-            <>
-              <p className="mt-4 text-sm leading-relaxed text-fog">
-                Writes go straight to Firestore with your account. Only the
-                email hardcoded in{" "}
-                <span className="text-bone">firestore.rules</span> is allowed.
-              </p>
-              <button
-                onClick={() =>
-                  signInGoogle().catch((e) => setGateError(errMsg(e)))
-                }
-                className="mt-6 w-full bg-signal px-4 py-3 font-mono text-[11px] font-semibold tracking-[0.2em] text-bone uppercase transition-colors hover:bg-frost hover:text-ink"
-              >
-                Sign in with Google
-              </button>
-              {gateError && (
-                <p className="mt-2 font-mono text-xs text-frost">{gateError}</p>
-              )}
-            </>
-          )}
-        </div>
-      );
-    }
+  if (!user) {
     return (
       <div className="mx-auto max-w-md border border-bone/12 bg-coal p-8">
         <div className="flex items-center gap-3">
           <KeyRound size={18} className="text-frost" strokeWidth={1.8} />
-          <span className="font-mono text-[10px] tracking-[0.24em] text-fog">
-            CONTROL DECK — RESTRICTED
-          </span>
+          <span className="kicker text-fog">Control deck · restricted</span>
         </div>
-        <h2 className="mt-4 font-display text-4xl tracking-tight text-bone">
-          ADMIN KEY<span className="text-frost">.</span>
-        </h2>
-        <input
-          type="password"
-          value={keyInput}
-          onChange={(e) => setKeyInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && tryKey()}
-          placeholder="Enter admin key"
-          className="mt-6 w-full border border-bone/20 bg-ink px-4 py-3 font-mono text-sm text-bone outline-none focus:border-frost"
-        />
-        {gateError && (
-          <p className="mt-2 font-mono text-xs text-frost">{gateError}</p>
+        <h2 className="mt-4 font-display text-3xl font-light text-bone">Admin sign-in</h2>
+        {fsReady === false ? (
+          <p className="mt-6 font-mono text-xs leading-relaxed text-frost">
+            Firebase web config not found. Set the six FIREBASE_* env vars,
+            restart, then reload.
+          </p>
+        ) : (
+          <>
+            <p className="mt-4 text-sm leading-relaxed text-fog">
+              Writes go straight to Firestore with your account. Only the admin
+              UID in <span className="text-bone">firestore.rules</span> can write.
+            </p>
+            <button
+              onClick={() =>
+                signInGoogle().catch((e) => {
+                  if (!isUserCancelled(e)) setGateError(errMsg(e));
+                })
+              }
+              className="kicker mt-6 w-full bg-signal px-4 py-3 text-ink transition-colors hover:bg-bone hover:text-ink"
+            >
+              Sign in with Google
+            </button>
+            {gateError && <p className="mt-2 font-mono text-xs text-frost">{gateError}</p>}
+          </>
         )}
-        <button
-          onClick={tryKey}
-          className="mt-4 w-full bg-signal px-4 py-3 font-mono text-[11px] font-semibold tracking-[0.2em] text-bone uppercase transition-colors hover:bg-frost hover:text-ink"
-        >
-          Enter deck
-        </button>
-        <p className="mt-4 font-mono text-[10px] leading-relaxed tracking-[0.12em] text-fog">
-          DEFAULT KEY: sizing-admin — OVERRIDE WITH THE ADMIN_KEY ENV VAR.
-        </p>
       </div>
     );
   }
@@ -568,20 +437,11 @@ export default function AdminApp({
           ))}
         </div>
         <div className="flex items-center gap-3">
-          {mode === "firestore" && user && (
-            <span className="font-mono text-[10px] tracking-[0.14em] text-fog">
-              {user.email}
-            </span>
-          )}
+          <span className="font-mono text-[10px] tracking-[0.14em] text-fog">
+            {user.email}
+          </span>
           <button
-            onClick={() => {
-              if (mode === "postgres") {
-                sessionStorage.removeItem(KEY_STORE);
-                setKey(null);
-              } else {
-                void signOutUser().then(() => setUser(null));
-              }
-            }}
+            onClick={() => void signOutUser().then(() => setUser(null))}
             className="flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] text-fog uppercase transition-colors hover:text-bone"
           >
             <LogOut size={12} /> Exit deck
@@ -592,7 +452,7 @@ export default function AdminApp({
       <div className="mt-8">
         {tab === "brands" && BrandsTab}
         {tab === "charts" && (
-          <ChartsTab mode={mode} brands={brands} charts={charts} setCharts={setCharts} ops={ops} />
+          <ChartsTab brands={brands} charts={charts} setCharts={setCharts} ops={ops} />
         )}
         {tab === "products" && (
           <ProductsTab
@@ -686,13 +546,11 @@ function AddBrandForm({
 /* ============================================================== charts tab */
 
 function ChartsTab({
-  mode,
   brands,
   charts,
   setCharts,
   ops,
 }: {
-  mode: AdminMode;
   brands: AdminBrand[];
   charts: AdminChart[];
   setCharts: React.Dispatch<React.SetStateAction<AdminChart[]>>;
@@ -713,11 +571,14 @@ function ChartsTab({
     if (!brand) return;
     setLoading(true);
     setMsg("");
-    const d = await fetch(
-      `/api/chart?brand=${brand.slug}&category=${category}&gender=${gender}`
-    ).then((r) => r.json());
+    const snap = await getDoc(
+      doc(clientFs()!, "charts", `${brand.slug}__${category}__${gender}`)
+    );
+    const d = (snap.data() ?? {}) as { rows?: Record<string, unknown>[]; needsData?: boolean };
     setRows(
-      (d.rows ?? []).map((r: any) => ({
+      [...(d.rows ?? [])]
+        .sort((x, y) => Number(x.anchorValue) - Number(y.anchorValue))
+        .map((r: Record<string, any>) => ({
         anchorValue: String(r.anchorValue),
         eu: r.eu ?? "",
         uk: r.uk ?? "",
@@ -770,7 +631,7 @@ function ChartsTab({
               ...next[idx],
               rowCount: d.rowCount,
               needsData,
-              brandName: mode === "firestore" ? brand.name : next[idx].brandName,
+              brandName: brand.name,
             };
             return next;
           }
@@ -848,7 +709,7 @@ function ChartsTab({
           <button
             onClick={load}
             disabled={loading || !brand}
-            className="mt-4 flex w-full items-center justify-center gap-2 bg-signal px-4 py-2.5 font-mono text-[10px] font-semibold tracking-[0.18em] text-bone uppercase transition-colors hover:bg-frost hover:text-ink disabled:opacity-40"
+            className="mt-4 flex w-full items-center justify-center gap-2 bg-signal px-4 py-2.5 font-mono text-[10px] font-semibold tracking-[0.18em] text-bone uppercase transition-colors hover:bg-bone hover:text-ink disabled:opacity-40"
           >
             {loading ? <Loader2 size={12} className="animate-spin" /> : <Table2 size={12} />}
             Load chart

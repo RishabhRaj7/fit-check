@@ -2,36 +2,44 @@
 
 import type { Auth, User } from "firebase/auth";
 import type { Firestore } from "firebase/firestore";
-import type { FirebaseApp } from "firebase/app";
 import type { WebConfig } from "./app";
+import { CONFIG_ELEMENT_ID } from "./configElement";
 
-let app: FirebaseApp | null = null;
+let ready: Promise<boolean> | null = null;
 let auth: Auth | null = null;
 let fs: Firestore | null = null;
 
-/** Fetch the public config from the server and init the SDK in-browser. */
-export async function initClientFirebase(): Promise<boolean> {
-  if (app) return true;
+function readConfig(): WebConfig | null {
+  const el = document.getElementById(CONFIG_ELEMENT_ID);
+  if (!el?.textContent) return null;
   try {
-    const res = await fetch("/api/firebase/config");
-    const data = (await res.json()) as {
-      configured: boolean;
-      config?: WebConfig;
-    };
-    if (!data.configured || !data.config) return false;
-    const [{ initializeApp, getApps, getApp }, { getAuth }, { getFirestore }] =
-      await Promise.all([
-        import("firebase/app"),
-        import("firebase/auth"),
-        import("firebase/firestore"),
-      ]);
-    app = getApps().length ? getApp() : initializeApp(data.config);
-    auth = getAuth(app);
-    fs = getFirestore(app);
-    return true;
+    return JSON.parse(el.textContent) as WebConfig;
   } catch {
-    return false;
+    return null;
   }
+}
+
+/** Init the SDK in the browser once. Resolves false when Firebase isn't configured. */
+export function initClientFirebase(): Promise<boolean> {
+  ready ??= (async () => {
+    const config = readConfig();
+    if (!config) return false;
+    try {
+      const [{ initializeApp, getApps, getApp }, { getAuth }, { getFirestore }] =
+        await Promise.all([
+          import("firebase/app"),
+          import("firebase/auth"),
+          import("firebase/firestore"),
+        ]);
+      const app = getApps().length ? getApp() : initializeApp(config);
+      auth = getAuth(app);
+      fs = getFirestore(app);
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+  return ready;
 }
 
 export function clientAuth(): Auth | null {
@@ -47,11 +55,19 @@ export function onAuthChange(cb: (u: User | null) => void): () => void {
   return auth.onAuthStateChanged(cb);
 }
 
-export async function signInGoogle(): Promise<User> {
-  const { GoogleAuthProvider, signInWithPopup } = await import("firebase/auth");
+export async function signInGoogle(): Promise<void> {
+  const { GoogleAuthProvider, signInWithPopup, signInWithRedirect } = await import(
+    "firebase/auth"
+  );
   if (!auth) throw new Error("Firebase not initialised");
-  const cred = await signInWithPopup(auth, new GoogleAuthProvider());
-  return cred.user;
+  const provider = new GoogleAuthProvider();
+  try {
+    await signInWithPopup(auth, provider);
+  } catch (e) {
+    // Popup blockers (and some in-app browsers) — fall back to a full redirect.
+    if (errorCode(e) === "auth/popup-blocked") await signInWithRedirect(auth, provider);
+    else throw e;
+  }
 }
 
 export async function signOutUser(): Promise<void> {
@@ -59,11 +75,18 @@ export async function signOutUser(): Promise<void> {
   if (auth) await signOut(auth);
 }
 
+export function errorCode(e: unknown): string {
+  return typeof e === "object" && e !== null && "code" in e
+    ? String((e as { code: unknown }).code)
+    : "";
+}
+
 export function isPermissionDenied(e: unknown): boolean {
-  return (
-    typeof e === "object" &&
-    e !== null &&
-    "code" in e &&
-    String((e as { code: unknown }).code).includes("permission-denied")
-  );
+  return errorCode(e).includes("permission-denied");
+}
+
+/** Closing the popup yourself isn't an error worth showing. */
+export function isUserCancelled(e: unknown): boolean {
+  const c = errorCode(e);
+  return c === "auth/popup-closed-by-user" || c === "auth/cancelled-popup-request";
 }

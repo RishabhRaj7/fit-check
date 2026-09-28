@@ -2,267 +2,240 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, Check, Footprints, Shirt } from "lucide-react";
-import { CATEGORIES, GENDERS, type CategoryId } from "@/lib/categories";
+import { AnimatePresence, motion } from "framer-motion";
+import AnchorInput, { type Anchor } from "@/components/AnchorInput";
+import { CATEGORIES, GENDERS, formatCm, rowPrimaryLabel, type CategoryId } from "@/lib/categories";
+import { isUserCancelled } from "@/lib/firebase/clientAuth";
 import { cn } from "@/lib/format";
-import { saveEntry } from "@/lib/profile";
-import KnownSizePicker, {
-  type LiteBrand,
-  type PickedSize,
-} from "@/components/KnownSizePicker";
+import { saveEntry, setGender, signIn, useProfile } from "@/lib/profile";
+import { passport, type CategoryCharts, type LiteBrand } from "@/lib/sizing";
 
-type Step = 0 | 1 | 2;
+const STEPS: { category: CategoryId; kicker: string; title: string; sub: string }[] = [
+  {
+    category: "sneakers",
+    kicker: "Footwear",
+    title: "Your usual sneaker size.",
+    sub: "Pick the brand and size that fits you best — we work out your foot length from their chart. Or measure it; it takes a minute.",
+  },
+  {
+    category: "tshirt",
+    kicker: "Tops",
+    title: "A T-shirt that fits you right.",
+    sub: "Any brand. Its size becomes your chest measurement.",
+  },
+  {
+    category: "trousers",
+    kicker: "Bottoms",
+    title: "Your trouser waist.",
+    sub: "The waist size on a pair that fits well. Inseam doesn't matter here.",
+  },
+];
 
 export default function OnboardingFlow({
-  brandSets,
+  charts,
+  brands,
 }: {
-  brandSets: Record<"sneakers" | "tshirt" | "trousers", LiteBrand[]>;
+  charts: Record<CategoryId, CategoryCharts>;
+  brands: Record<CategoryId, LiteBrand[]>;
 }) {
-  const [step, setStep] = useState<Step>(0);
-  const [gender, setGender] = useState<"men" | "women">("men");
-  const [sneakerPick, setSneakerPick] = useState<PickedSize | null>(null);
-  const [apparelCat, setApparelCat] = useState<"tshirt" | "trousers">("tshirt");
-  const [apparelPick, setApparelPick] = useState<PickedSize | null>(null);
-  const [count, setCount] = useState(0);
+  const { gender, user, syncAvailable } = useProfile();
+  const [step, setStep] = useState(0);
+  const [picks, setPicks] = useState<Partial<Record<CategoryId, Anchor>>>({});
+  const [saved, setSaved] = useState<CategoryId[]>([]);
+  const [signInError, setSignInError] = useState("");
 
-  const commitSneakers = () => {
-    if (sneakerPick) {
-      void saveEntry("sneakers", gender, {
-        anchorValue: sneakerPick.anchorValue,
-        sourceBrandSlug: sneakerPick.slug,
-        sourceBrandName: sneakerPick.name,
-        sourceSizeLabel: sneakerPick.label,
-        confidence: "exact",
-      });
-      setCount((c) => c + 1);
+  const done = step >= STEPS.length;
+  const current = STEPS[Math.min(step, STEPS.length - 1)];
+  const pick = picks[current.category] ?? null;
+
+  const next = async (keep: boolean) => {
+    if (keep && pick) {
+      await saveEntry(current.category, gender, { ...pick, confidence: "exact" });
+      setSaved((s) => [...s.filter((c) => c !== current.category), current.category]);
     }
+    setStep((s) => s + 1);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
-
-  const commitApparel = () => {
-    if (apparelPick) {
-      void saveEntry(apparelCat, gender, {
-        anchorValue: apparelPick.anchorValue,
-        sourceBrandSlug: apparelPick.slug,
-        sourceBrandName: apparelPick.name,
-        sourceSizeLabel: apparelPick.label,
-        confidence: "exact",
-      });
-      setCount((c) => c + 1);
-    }
-  };
-
-  const steps: { id: Step; kicker: string; title: string; sub: string }[] = [
-    {
-      id: 0,
-      kicker: "STEP 01 — FOOTWEAR",
-      title: "WHAT'S YOUR USUAL SNEAKER SIZE?",
-      sub: "Pick the brand and size whose fit you trust most. We back-calculate your exact foot length from their chart.",
-    },
-    {
-      id: 1,
-      kicker: "STEP 02 — APPAREL",
-      title: "AND YOUR GO-TO FIT UP TOP / BELOW.",
-      sub: "T-shirt or trousers — either one anchors your chest or waist measurement.",
-    },
-  ];
 
   return (
-    <div className="relative">
-      <div className="pointer-events-none absolute -top-6 right-0 hidden select-none lg:block">
-        <span className="font-display text-[11rem] leading-none text-stroke">
-          {String(step + 1).padStart(2, "0")}
-        </span>
-      </div>
-
-      {step < 2 && (
-        <div className="mb-8 flex items-center justify-between gap-4">
-          <span className="font-mono text-[10px] tracking-[0.24em] text-fog">
-            {steps[step].kicker}
-          </span>
-          <div className="flex border border-bone/15">
-            {GENDERS.map((g) => (
-              <button
-                key={g.id}
-                onClick={() => setGender(g.id as "men" | "women")}
-                className={cn(
-                  "px-3 py-1.5 font-mono text-[10px] tracking-[0.18em] transition-colors",
-                  gender === g.id ? "bg-bone text-ink" : "text-fog hover:text-bone"
-                )}
-              >
-                {g.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+    <div>
+      {/* progress */}
+      <ol className="grid grid-cols-3 gap-px" aria-label="Progress">
+        {STEPS.map((s, i) => (
+          <li key={s.category} aria-current={i === step ? "step" : undefined}>
+            <div className={cn("h-px", i < step || done ? "bg-signal" : i === step ? "bg-bone" : "bg-bone/15")} />
+            <p className={cn("kicker mt-3", i === step ? "text-bone" : "text-fog")}>
+              0{i + 1} {s.kicker}
+              {saved.includes(s.category) && <span className="text-frost"> · saved</span>}
+            </p>
+          </li>
+        ))}
+      </ol>
 
       <AnimatePresence mode="wait">
-        {step === 0 && (
+        {!done ? (
           <motion.div
-            key="s0"
-            initial={{ opacity: 0, y: 24 }}
+            key={current.category}
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -24 }}
-            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="mt-12 grid gap-10 lg:grid-cols-12"
           >
-            <h2 className="max-w-2xl font-display text-4xl leading-[0.95] tracking-tight text-bone md:text-6xl">
-              {steps[0].title}
-            </h2>
-            <p className="mt-4 max-w-lg text-sm leading-relaxed text-fog">
-              {steps[0].sub}
-            </p>
-            <div className="mt-8 max-w-2xl border border-bone/12 bg-coal p-5 md:p-7">
-              <KnownSizePicker
-                category="sneakers"
-                gender={gender}
-                brands={brandSets.sneakers}
-                value={sneakerPick}
-                onChange={setSneakerPick}
-              />
+            <div className="lg:col-span-5">
+              <p className="font-display text-[5rem] leading-none font-extralight text-bone/15 tabular md:text-[8rem]" aria-hidden="true">
+                0{step + 1}
+              </p>
+              <h2 className="mt-4 font-display text-[clamp(2rem,4vw,3.25rem)] leading-[1.02] font-light tracking-[-0.025em] text-bone">
+                {current.title}
+              </h2>
+              <p className="mt-4 max-w-md text-base leading-relaxed text-bone/65">{current.sub}</p>
+              {step === 0 && (
+                <div className="mt-8">
+                  <p className="kicker mb-2 text-fog">Charts for</p>
+                  <div className="flex border border-bone/15 sm:inline-flex" role="group" aria-label="Charts for">
+                    {GENDERS.map((g) => (
+                      <button
+                        key={g.id}
+                        aria-pressed={gender === g.id}
+                        onClick={() => {
+                          setGender(g.id);
+                          setPicks({});
+                        }}
+                        className={cn(
+                          "kicker flex-1 px-5 py-2.5 transition-colors",
+                          gender === g.id ? "bg-bone text-ink" : "text-fog hover:text-bone"
+                        )}
+                      >
+                        {g.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-            <div className="mt-8 flex flex-wrap items-center gap-4">
-              <button
-                disabled={!sneakerPick}
-                onClick={() => {
-                  commitSneakers();
-                  setStep(1);
-                }}
-                className="flex items-center gap-2 bg-signal px-6 py-3.5 font-mono text-[11px] font-semibold tracking-[0.2em] text-bone uppercase transition-colors hover:bg-bone hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"
-              >
-                Anchor it <ArrowRight size={14} strokeWidth={2.4} />
-              </button>
-              <button
-                onClick={() => setStep(1)}
-                className="font-mono text-[11px] tracking-[0.2em] text-fog uppercase transition-colors hover:text-bone"
-              >
-                Skip this one
-              </button>
-            </div>
-          </motion.div>
-        )}
 
-        {step === 1 && (
-          <motion.div
-            key="s1"
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -24 }}
-            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <h2 className="max-w-2xl font-display text-4xl leading-[0.95] tracking-tight text-bone md:text-6xl">
-              {steps[1].title}
-            </h2>
-            <p className="mt-4 max-w-lg text-sm leading-relaxed text-fog">
-              {steps[1].sub}
-            </p>
-
-            <div className="mt-6 flex gap-px border border-bone/15 bg-bone/15">
-              {(
-                [
-                  ["tshirt", "T-SHIRT", Shirt],
-                  ["trousers", "TROUSERS / JEANS", Footprints],
-                ] as [CategoryId, string, typeof Shirt][]
-              ).map(([c, label, Icon]) => (
+            <div className="lg:col-span-7">
+              <div className="border border-bone/12 bg-coal p-5 md:p-7">
+                <AnchorInput
+                  key={`${current.category}-${gender}`}
+                  category={current.category}
+                  gender={gender}
+                  brands={brands[current.category]}
+                  charts={charts[current.category]}
+                  value={pick}
+                  onChange={(a) => setPicks((p) => ({ ...p, [current.category]: a }))}
+                />
+              </div>
+              <div className="mt-6 flex flex-wrap items-center gap-3">
                 <button
-                  key={c}
-                  onClick={() => {
-                    setApparelCat(c as "tshirt" | "trousers");
-                    setApparelPick(null);
-                  }}
-                  className={cn(
-                    "flex flex-1 items-center justify-center gap-2 px-4 py-3 font-mono text-[10px] tracking-[0.18em] transition-colors",
-                    apparelCat === c
-                      ? "bg-bone text-ink"
-                      : "bg-ink text-fog hover:text-bone"
-                  )}
+                  disabled={!pick}
+                  onClick={() => void next(true)}
+                  className="kicker flex h-12 items-center bg-signal px-6 text-bone transition-colors hover:bg-bone hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"
                 >
-                  <Icon size={13} strokeWidth={1.8} /> {label}
+                  {pick
+                    ? `Save ${formatCm(pick.anchorValue)} cm & continue`
+                    : "Choose a size to continue"}
                 </button>
-              ))}
-            </div>
-
-            <div className="mt-6 max-w-2xl border border-bone/12 bg-coal p-5 md:p-7">
-              <KnownSizePicker
-                key={apparelCat}
-                category={apparelCat}
-                gender={gender}
-                brands={brandSets[apparelCat]}
-                value={apparelPick}
-                onChange={setApparelPick}
-              />
-            </div>
-            <div className="mt-8 flex flex-wrap items-center gap-4">
-              <button
-                disabled={!apparelPick}
-                onClick={() => {
-                  commitApparel();
-                  setStep(2);
-                }}
-                className="flex items-center gap-2 bg-signal px-6 py-3.5 font-mono text-[11px] font-semibold tracking-[0.2em] text-bone uppercase transition-colors hover:bg-bone hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"
-              >
-                Anchor it <ArrowRight size={14} strokeWidth={2.4} />
-              </button>
-              <button
-                onClick={() => setStep(2)}
-                className="font-mono text-[11px] tracking-[0.2em] text-fog uppercase transition-colors hover:text-bone"
-              >
-                Skip &amp; finish
-              </button>
+                <button
+                  onClick={() => void next(false)}
+                  className="kicker flex h-12 items-center px-4 text-fog transition-colors hover:text-bone"
+                >
+                  Skip
+                </button>
+                {step > 0 && (
+                  <button
+                    onClick={() => setStep((s) => s - 1)}
+                    className="kicker ml-auto flex h-12 items-center px-4 text-fog transition-colors hover:text-bone"
+                  >
+                    Back
+                  </button>
+                )}
+              </div>
             </div>
           </motion.div>
-        )}
-
-        {step === 2 && (
+        ) : (
           <motion.div
-            key="s2"
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ type: "spring", stiffness: 220, damping: 20 }}
-            className="border border-bone/12 bg-coal p-8 md:p-12"
+            key="done"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+            className="mt-12"
           >
-            <span className="font-mono text-[10px] tracking-[0.24em] text-frost">
-              PROFILE ANCHORED
-            </span>
-            <h2 className="mt-3 font-display text-5xl leading-[0.9] tracking-tight text-bone md:text-7xl">
-              LOCKED IN<span className="text-frost">.</span>
+            <h2 className="font-display text-[clamp(2.25rem,5vw,4rem)] leading-[1] font-light tracking-[-0.03em] text-bone">
+              {saved.length ? "Calibrated." : "Nothing saved yet."}
             </h2>
-            <p className="mt-4 max-w-md text-sm leading-relaxed text-fog">
-              {count > 0
-                ? `${count} ${count === 1 ? "measurement" : "measurements"} saved to this device. Every brand page now converts for you instantly — no re-asking, ever.`
-                : "Nothing saved yet — you can anchor a size anytime from any brand page."}
+            <p className="mt-4 max-w-xl text-base leading-relaxed text-bone/65">
+              {saved.length
+                ? "Here's a first look. Every brand page now opens with your size on it, and your profile holds the full list."
+                : "No problem — you can set a size from any brand page, or from your profile."}
             </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link
-                href="/category/sneakers"
-                className="flex items-center gap-2 bg-signal px-6 py-3.5 font-mono text-[11px] font-semibold tracking-[0.2em] text-bone uppercase transition-colors hover:bg-bone hover:text-ink"
-              >
-                Find my size in a brand <ArrowRight size={14} strokeWidth={2.4} />
+
+            {saved.length > 0 && (
+              <div className="mt-10 grid gap-4 md:grid-cols-3">
+                {STEPS.filter((s) => saved.includes(s.category)).map((s) => {
+                  const a = picks[s.category]!;
+                  const rows = passport(charts[s.category], brands[s.category], s.category, gender, a.anchorValue)
+                    .filter((r) => r.match.row && r.match.status !== "estimate")
+                    .slice(0, 5);
+                  return (
+                    <div key={s.category} className="border border-bone/12 p-5">
+                      <div className="flex items-baseline justify-between border-b border-bone/12 pb-3">
+                        <span className="kicker text-fog">{CATEGORIES[s.category].label}</span>
+                        <span className="kicker text-bone">{formatCm(a.anchorValue)} cm</span>
+                      </div>
+                      <ul>
+                        {rows.map(({ brand, match }) => (
+                          <li key={brand.slug} className="flex items-baseline justify-between border-b border-bone/8 py-2.5 last:border-0">
+                            <span className="text-sm text-bone/80">{brand.name}</span>
+                            <span className="font-display text-base font-light tabular text-bone">
+                              {rowPrimaryLabel(s.category, match.row!)}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {saved.length > 0 && syncAvailable && !user && (
+              <div className="mt-8 flex flex-col justify-between gap-4 border border-bone/12 p-5 md:flex-row md:items-center">
+                <p className="max-w-xl text-sm leading-relaxed text-fog">
+                  <span className="text-bone">Saved on this device.</span> Sign in with Google to
+                  keep these sizes on your phone and laptop alike.
+                </p>
+                <div>
+                  <button
+                    onClick={() =>
+                      signIn().catch((e) => {
+                        if (!isUserCancelled(e)) setSignInError("Sign-in didn't complete. Please try again.");
+                      })
+                    }
+                    className="kicker flex h-11 items-center bg-bone px-5 text-ink transition-colors hover:bg-signal hover:text-bone"
+                  >
+                    Sign in with Google
+                  </button>
+                  {signInError && <p className="mt-2 text-sm text-frost">{signInError}</p>}
+                </div>
+              </div>
+            )}
+            {user && saved.length > 0 && (
+              <p className="kicker mt-6 text-fog">Synced to {user.email}</p>
+            )}
+
+            <div className="mt-10 flex flex-wrap gap-2">
+              <Link href="/profile" className="kicker flex h-12 items-center bg-signal px-6 text-bone transition-colors hover:bg-bone hover:text-ink">
+                See all my sizes
               </Link>
-              <Link
-                href="/profile"
-                className="flex items-center gap-2 border border-bone/25 px-6 py-3.5 font-mono text-[11px] tracking-[0.2em] text-bone uppercase transition-colors hover:border-signal hover:text-frost"
-              >
-                <Check size={13} strokeWidth={2.2} /> View profile
+              <Link href="/category/sneakers" className="kicker flex h-12 items-center border border-bone/20 px-6 text-bone transition-colors hover:border-bone/60">
+                Browse brands
               </Link>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-
-      {step < 2 && (
-        <div className="mt-10 flex items-center gap-3">
-          {[0, 1, 2].map((i) => (
-            <span
-              key={i}
-              className={cn(
-                "h-1 flex-1 transition-colors",
-                i <= step ? "bg-signal" : "bg-bone/12"
-              )}
-            />
-          ))}
-        </div>
-      )}
     </div>
   );
 }

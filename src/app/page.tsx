@@ -1,462 +1,382 @@
 import Link from "next/link";
+import Hero from "@/components/Hero";
+import SpreadChart from "@/components/SpreadChart";
+import AnchorDiagram from "@/components/AnchorDiagram";
+import { FadeUp, LineReveal, Rise } from "@/components/motion";
 import {
-  ArrowDown,
-  ArrowUpRight,
-  Crosshair,
-  Database,
-  Footprints,
-  Repeat2,
-  Ruler,
-  Shirt,
-  TriangleAlert,
-} from "lucide-react";
-import TapeHero from "@/components/hero/TapeHero";
-import Marquee from "@/components/Marquee";
-import { ClipReveal, FadeUp } from "@/components/motion";
-import { CATEGORY_ORDER, CATEGORIES, type CategoryId } from "@/lib/categories";
+  brandsIn,
+  chartsIn,
+  getCatalog,
+  liteBrands,
+  stats,
+  type Brand,
+} from "@/lib/catalog";
+import {
+  CATEGORY_ORDER,
+  CATEGORIES,
+  rowPrimaryLabel,
+  type CategoryId,
+} from "@/lib/categories";
 import { cn } from "@/lib/format";
-import { getChartAvailability, getStats, listBrands } from "@/lib/queries";
+import { chartFor, nearestRow, type CategoryCharts } from "@/lib/sizing";
 
 export const dynamic = "force-dynamic";
 
-const CATEGORY_ICONS: Record<CategoryId, typeof Footprints> = {
-  sneakers: Footprints,
-  slides: Footprints,
-  tshirt: Shirt,
-  trousers: Ruler,
-};
+const FEATURED = ["nike", "adidas", "puma", "new-balance", "asics"];
+
+function labelAt(charts: CategoryCharts, slug: string, cm: number): string | null {
+  const c = chartFor(charts, slug, "men");
+  return c ? rowPrimaryLabel("sneakers", nearestRow(c.rows, cm).row) : null;
+}
+
+function SectionHead({
+  index,
+  kicker,
+  title,
+  children,
+}: {
+  index: string;
+  kicker: string;
+  title: React.ReactNode;
+  children?: React.ReactNode;
+}) {
+  return (
+    <FadeUp className="grid gap-6 md:grid-cols-12">
+      <p className="kicker text-fog md:col-span-3">
+        <span className="text-frost">{index}</span> — {kicker}
+      </p>
+      <div className="md:col-span-9">
+        <h2 className="font-display text-[clamp(2rem,4.4vw,3.75rem)] leading-[1.02] font-light tracking-[-0.025em] text-bone">
+          {title}
+        </h2>
+        {children && (
+          <div className="mt-5 max-w-2xl text-base leading-relaxed text-bone/65">{children}</div>
+        )}
+      </div>
+    </FadeUp>
+  );
+}
 
 export default async function Home() {
-  const [allBrands, stats, sneakAvail] = await Promise.all([
-    listBrands(),
-    getStats(),
-    getChartAvailability("sneakers"),
-  ]);
-  const countFor = (c: string) =>
-    allBrands.filter((b) => b.categories.includes(c)).length;
+  const cat = await getCatalog();
+  const s = stats(cat);
+  const sneakerBrands = brandsIn(cat, "sneakers");
+  const sneakerCharts = chartsIn(cat, "sneakers");
+  const charted = sneakerBrands.filter((b) => sneakerCharts[b.slug]);
+  const featured = [
+    ...FEATURED.map((slug) => charted.find((b) => b.slug === slug)).filter(
+      (b): b is Brand => !!b
+    ),
+    ...charted.filter((b) => !FEATURED.includes(b.slug)),
+  ].slice(0, 5);
 
-  // hero brand strip — the requested lineup first (when charts exist),
-  // then the next sneaker brands with charts from the database
-  const wanted = ["nike", "adidas", "puma", "new-balance", "asics"].filter(
-    (s) => (sneakAvail[s] ?? []).length > 0
-  );
-  const extra = allBrands
-    .filter(
-      (b) =>
-        b.categories.includes("sneakers") &&
-        (sneakAvail[b.slug] ?? []).length > 0 &&
-        !wanted.includes(b.slug)
-    )
-    .map((b) => b.slug)
-    .slice(0, Math.max(0, 5 - wanted.length));
-  const heroBrands = [...wanted, ...extra]
-    .map((slug) => {
-      const b = allBrands.find((x) => x.slug === slug);
-      return b ? { slug: b.slug, name: b.name } : null;
-    })
-    .filter((x): x is { slug: string; name: string } => x !== null);
+  // Copy from the data itself: two brands that disagree at 26.5 cm.
+  let disagreement: [string, string, string, string] | null = null;
+  outer: for (const a of featured) {
+    for (const b of featured) {
+      const la = labelAt(sneakerCharts, a.slug, 26.5);
+      const lb = labelAt(sneakerCharts, b.slug, 26.5);
+      if (a !== b && la && lb && la !== lb) {
+        disagreement = [a.name, la, b.name, lb];
+        break outer;
+      }
+    }
+  }
+
+  const perCategory = CATEGORY_ORDER.map((c) => {
+    const brands = brandsIn(cat, c);
+    const charts = chartsIn(cat, c);
+    return { id: c, brands: brands.length, charted: brands.filter((b) => charts[b.slug]).length };
+  });
+
+  const coverage = [...cat.brands].sort((a, b) => a.name.localeCompare(b.name));
+  const chartsBy = Object.fromEntries(
+    CATEGORY_ORDER.map((c) => [c, chartsIn(cat, c)])
+  ) as Record<CategoryId, CategoryCharts>;
+
+  const example = featured.map((b) => ({
+    name: b.name,
+    size: labelAt(sneakerCharts, b.slug, 26.5) ?? "—",
+  }));
 
   return (
     <>
-      {/* ------------------------------------------------------------ HERO */}
-      <section className="relative min-h-[92svh] overflow-hidden border-b border-bone/10">
-        {/* rotating measurement ticks, left edge */}
-        <div className="pointer-events-none absolute top-1/2 left-2 hidden -translate-y-1/2 -rotate-90 font-mono text-[10px] tracking-[0.5em] text-fog xl:block">
-          26.5 CM — THE ONLY NUMBER THAT MATTERS
-        </div>
+      {/* ------------------------------------------------------------ hero */}
+      <section className="border-b border-bone/10">
+        <div className="mx-auto max-w-[1440px] px-4 pt-8 pb-12 md:px-8 md:pt-10 md:pb-16">
+          <p className="kicker flex items-center gap-2.5 text-fog">
+            <span className="inline-block h-1.5 w-1.5 bg-signal" />
+            Size calibration · India
+          </p>
+          <h1 className="mt-5 font-display text-[clamp(2.5rem,6.4vw,6.25rem)] leading-[0.98] font-light tracking-[-0.035em]">
+            <LineReveal>Same feet.</LineReveal>
+            <LineReveal delay={0.18}>
+              <span className="text-bone/45">Different numbers.</span>
+            </LineReveal>
+          </h1>
 
-        <div className="pointer-events-none relative z-10 mx-auto flex min-h-[50svh] w-full max-w-[1600px] flex-1 flex-col justify-center px-4 pt-4 pb-24 md:min-h-[92svh] md:px-8 md:pt-24">
-          <div className="max-w-3xl">
-            <p className="flex items-center gap-2 font-mono text-[10px] tracking-[0.3em] text-bone/80">
-              <span className="inline-block h-2 w-2 bg-signal" />
-              CROSS-BRAND SIZE CONVERSION — INDIA
-            </p>
-            <h1 className="mt-6 font-display text-[clamp(3.6rem,10vw,9rem)] leading-[0.88] tracking-tight">
-              <ClipReveal>
-                <span className="block text-bone">SAME FEET.</span>
-              </ClipReveal>
-              <ClipReveal delay={0.12}>
-                <span className="block text-stroke">DIFFERENT</span>
-              </ClipReveal>
-              <ClipReveal delay={0.24}>
-                <span className="block text-bone">
-                  NUMBERS<span className="text-frost">.</span>
-                </span>
-              </ClipReveal>
-            </h1>
-            <FadeUp delay={0.35} className="mt-6 max-w-md">
-              <p className="text-sm leading-relaxed text-bone/70 md:text-base">
-                Adidas says UK 8. Nike says UK 7. We say stop guessing. Anchor
-                your body once — convert into{" "}
-                <span className="text-bone">{stats.brands} brands</span>{" "}
-                instantly, down to the exact chart row.
-              </p>
-            </FadeUp>
-            <FadeUp delay={0.45} className="pointer-events-auto mt-8 flex flex-wrap gap-3">
-              <Link
-                href="/onboarding"
-                className="flex items-center gap-2 bg-signal px-7 py-4 font-mono text-[11px] font-semibold tracking-[0.2em] text-bone uppercase transition-colors hover:bg-bone hover:text-ink"
-              >
-                <Ruler size={14} strokeWidth={2.2} /> Find my size
-              </Link>
-              <Link
-                href="#categories"
-                className="flex items-center gap-2 border border-bone/25 px-7 py-4 font-mono text-[11px] tracking-[0.2em] text-bone uppercase transition-colors hover:border-signal hover:text-frost"
-              >
-                Browse brands <ArrowDown size={14} strokeWidth={2.2} />
-              </Link>
-            </FadeUp>
-          </div>
-
-          <FadeUp delay={0.55} className="pointer-events-auto absolute right-4 bottom-0 left-4 md:right-8 md:left-8">
-            <div className="flex flex-wrap gap-px border border-bone/15 bg-bone/15">
-              {[
-                [String(stats.brands), "BRANDS LIVE"],
-                [String(stats.charts), "SIZE CHARTS"],
-                [`${stats.rows}+`, "DATA ROWS"],
-                ["1", "ANCHOR PER CATEGORY"],
-              ].map(([v, l]) => (
-                <div
-                  key={l}
-                  className="flex flex-1 items-baseline justify-between gap-3 bg-ink/90 px-4 py-3 backdrop-blur-sm min-w-36"
-                >
-                  <span className="font-display text-2xl text-bone md:text-3xl">
-                    {v}
-                  </span>
-                  <span className="font-mono text-[9px] tracking-[0.18em] text-fog">
-                    {l}
-                  </span>
+          <div className="mt-8 grid gap-10 md:mt-10 lg:grid-cols-12">
+            <div className="flex flex-col justify-between gap-10 lg:col-span-4">
+              <Rise delay={0.3}>
+                <p className="max-w-sm text-base leading-relaxed text-bone/75">
+                  {disagreement ? (
+                    <>
+                      For a 26.5 cm foot, {disagreement[0]} says{" "}
+                      <span className="text-bone">{disagreement[1]}</span> and{" "}
+                      {disagreement[2]} says{" "}
+                      <span className="text-bone">{disagreement[3]}</span>.{" "}
+                    </>
+                  ) : (
+                    <>Brands don&apos;t agree on what a UK 8 is. </>
+                  )}
+                  Fit Check keeps one measurement — your foot, chest or waist in
+                  centimetres — and reads it back in each brand&apos;s own chart.
+                </p>
+                <div className="mt-8 flex flex-wrap gap-2">
+                  <Link
+                    href="/onboarding"
+                    className="kicker flex h-12 items-center bg-signal px-6 text-bone transition-colors hover:bg-bone hover:text-ink"
+                  >
+                    Find my size
+                  </Link>
+                  <Link
+                    href="#categories"
+                    className="kicker flex h-12 items-center border border-bone/20 px-6 text-bone transition-colors hover:border-bone/60"
+                  >
+                    Browse brands
+                  </Link>
                 </div>
-              ))}
+              </Rise>
+              <Rise delay={0.4}>
+                <dl className="grid grid-cols-3 border-t border-bone/12">
+                  {[
+                    [s.brands, "Brands"],
+                    [s.charts, "Charts"],
+                    [s.rows, "Chart rows"],
+                  ].map(([v, l], i) => (
+                    <div key={l} className={cn("pt-4", i > 0 && "border-l border-bone/12 pl-4")}>
+                      <dd className="font-display text-2xl font-light tabular text-bone md:text-3xl">{v}</dd>
+                      <dt className="kicker mt-1 text-fog">{l}</dt>
+                    </div>
+                  ))}
+                </dl>
+              </Rise>
             </div>
+            <Rise delay={0.2} className="lg:col-span-8">
+              <Hero
+                featured={liteBrands(featured)}
+                brands={liteBrands(sneakerBrands)}
+                charts={sneakerCharts}
+              />
+              <p className="kicker mt-3 text-fog">
+                Drag the scale · pick a brand · wave over the number
+              </p>
+            </Rise>
+          </div>
+        </div>
+      </section>
+
+      {/* --------------------------------------------------------- spread */}
+      <section className="border-b border-bone/10">
+        <div className="mx-auto max-w-[1440px] px-4 py-20 md:px-8 md:py-28">
+          <SectionHead index="01" kicker="The problem" title={<>One foot. Several answers.</>}>
+            Every sneaker chart on file, read at the same foot length. Step the
+            measurement and watch brands split apart and regroup — this is why a
+            size you trust in one brand is a gamble in the next.
+          </SectionHead>
+          <FadeUp delay={0.1} className="mt-12 md:ml-[25%]">
+            <SpreadChart brands={liteBrands(sneakerBrands)} charts={sneakerCharts} />
           </FadeUp>
         </div>
-        <div className="relative mt-10 h-[430px] w-full md:absolute md:inset-0 md:mt-0 md:h-auto md:w-auto md:left-[36%]">
-          <TapeHero brands={heroBrands} />
-        </div>
       </section>
 
-      {/* ------------------------------------------------------- MARQUEE A */}
-      <section className="overflow-x-clip border-b border-bone/10">
-        <div className="-rotate-[1.1deg] scale-[1.02]">
-          <Marquee
-            items={[
-              "NIKE UK 8 IS NOT ADIDAS UK 8",
-              "ONE ANCHOR — EVERY BRAND",
-              "FOOT 26.5 CM",
-              "CHEST 98 CM",
-              "WAIST 81 CM",
-              "NO MORE SIZE-TABLE SQUINTING",
-            ]}
-            className="bg-signal py-3.5"
-            itemClassName="font-display text-2xl tracking-wide text-bone md:text-4xl"
-          />
-        </div>
-      </section>
-
-      {/* ------------------------------------------------------- CATEGORIES */}
-      <section id="categories" className="border-b border-bone/10">
-        <div className="mx-auto max-w-[1600px] px-4 py-20 md:px-8 md:py-28">
-          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-            <FadeUp>
-              <h2 className="font-display text-5xl leading-[0.9] tracking-tight text-bone md:text-8xl">
-                PICK A<br />
-                CATEGORY<span className="text-frost">.</span>
-              </h2>
-            </FadeUp>
-            <FadeUp delay={0.1}>
-              <p className="max-w-60 text-right font-mono text-[10px] leading-relaxed tracking-[0.16em] text-fog md:text-left">
-                FOUR SILOS. INDEPENDENT CHARTS. SLIDES NEVER BORROW SNEAKER
-                LOGIC.
-              </p>
-            </FadeUp>
-          </div>
-
-          <div className="mt-12 grid grid-cols-1 gap-px bg-bone/12 md:grid-cols-12">
-            {CATEGORY_ORDER.map((c, i) => {
-              const cat = CATEGORIES[c];
-              const Icon = CATEGORY_ICONS[c];
-              const span =
-                i === 0
-                  ? "md:col-span-7"
-                  : i === 1
-                    ? "md:col-span-5"
-                    : i === 2
-                      ? "md:col-span-5"
-                      : "md:col-span-7";
-              return (
-                <Link
-                  key={c}
-                  href={`/category/${c}`}
-                  className={cn(
-                    "group relative flex min-h-72 flex-col justify-between overflow-hidden border border-bone/12 bg-coal p-6 transition-colors duration-300 hover:bg-bone hover:text-ink md:min-h-96 md:p-8",
-                    span
-                  )}
-                >
-                  {i === 0 && (
-                    <div
-                      className="pointer-events-none absolute inset-0 opacity-25 mix-blend-luminosity transition-opacity group-hover:opacity-10"
-                      style={{
-                        backgroundImage: "url(/images/knit-texture.jpg)",
-                        backgroundSize: "cover",
-                        backgroundPosition: "center",
-                      }}
-                    />
-                  )}
-                  <div className="relative flex items-start justify-between">
-                    <span className="font-display text-sm tracking-[0.3em] text-frost">
-                      {String(i + 1).padStart(2, "0")}
-                    </span>
-                    <Icon
-                      size={20}
-                      strokeWidth={1.5}
-                      className="text-fog transition-colors group-hover:text-ink/60"
-                    />
-                  </div>
-                  <div className="relative">
-                    <span className="pointer-events-none absolute right-0 -bottom-4 font-display text-[6rem] leading-none text-stroke-faint select-none md:text-[9rem] group-hover:[-webkit-text-stroke-color:rgba(10,10,10,0.15)]">
-                      {cat.anchorLabel.split(" ")[0]}
-                    </span>
-                    <h3 className="font-display text-5xl leading-[0.9] tracking-tight text-bone uppercase transition-colors group-hover:text-ink md:text-7xl">
-                      {cat.label}
-                    </h3>
-                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                      <p className="max-w-56 text-xs leading-relaxed text-fog transition-colors group-hover:text-ink/70">
-                        {cat.tagline}
-                      </p>
-                      <span className="font-mono text-[10px] tracking-[0.18em] text-fog transition-colors group-hover:text-ink/70">
-                        {countFor(c)} BRANDS · ANCHOR: {cat.anchorLabel}
-                      </span>
-                    </div>
-                  </div>
-                  <span className="absolute top-6 right-16 flex h-10 w-10 items-center justify-center bg-signal text-bone opacity-0 transition-all duration-300 group-hover:opacity-100 md:top-8">
-                    <ArrowUpRight
-                      size={18}
-                      strokeWidth={2.2}
-                      className="transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
-                    />
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* --------------------------------------------------- ANCHOR METHOD */}
-      <section className="relative bg-bone text-ink">
-        <div className="mx-auto grid max-w-[1600px] gap-14 px-4 py-20 md:px-8 md:py-28 lg:grid-cols-[1.1fr_1fr]">
-          <div>
-            <FadeUp>
-              <p className="font-mono text-[10px] tracking-[0.3em] text-ink/60">
-                WHY IT WORKS
-              </p>
-              <h2 className="mt-4 font-display text-5xl leading-[0.9] tracking-tight md:text-8xl">
-                THE ANCHOR
-                <br />
-                METHOD<span className="text-signal">.</span>
-              </h2>
-            </FadeUp>
-            <FadeUp delay={0.1}>
-              <p className="mt-6 max-w-md text-sm leading-relaxed text-ink/70 md:text-base">
-                Everyone else builds brand-to-brand mapping tables — N brands
-                means N×N guesswork. We translate every chart into one neutral
-                body measurement, then back out. A new brand joins with a single
-                table. No pairwise mapping. Ever.
-              </p>
-            </FadeUp>
-
-            <div className="mt-12">
+      {/* --------------------------------------------------------- method */}
+      <section className="border-b border-bone/10">
+        <div className="mx-auto max-w-[1440px] px-4 py-20 md:px-8 md:py-28">
+          <SectionHead index="02" kicker="The method" title={<>Measure once. Read it anywhere.</>}>
+            Most converters map brand to brand, which multiplies with every brand
+            added. We index every chart against one body measurement instead — so a
+            new brand joins with a single table, and your size never has to be
+            translated twice.
+          </SectionHead>
+          <div className="mt-12 grid gap-10 md:grid-cols-12">
+            <ol className="md:col-span-5 md:col-start-4">
               {[
-                {
-                  n: "01",
-                  t: "MEASURE ONCE",
-                  d: "Foot length, chest, or waist — in centimeters. Or let us back-calculate it from a size you already trust.",
-                  icon: Ruler,
-                },
-                {
-                  n: "02",
-                  t: "WE ANCHOR IT",
-                  d: "Your measurement becomes the anchor. Every brand chart in the system is indexed against that same anchor.",
-                  icon: Crosshair,
-                },
-                {
-                  n: "03",
-                  t: "CONVERT ANYWHERE",
-                  d: "Nearest-row lookup against the target brand's own chart gives you EU, UK, US, JPN and IND in one shot.",
-                  icon: Repeat2,
-                },
-              ].map((s, i) => (
-                <FadeUp key={s.n} delay={i * 0.08}>
-                  <div className="flex items-start gap-5 border-t border-ink/15 py-7">
-                    <span className="font-display text-4xl leading-none text-signal md:text-5xl">
-                      {s.n}
-                    </span>
+                ["Anchor", "Your foot length, chest or waist in cm — measured, or worked out from a size you already trust in any brand."],
+                ["Look up", "We find the nearest row in the target brand's own chart and read off UK, US, EU and JP together."],
+                ["Stay honest", "Exact row, nearest row (with the gap in cm), or an estimate from other brands when a chart isn't on file yet. Always labelled."],
+              ].map(([t, d], i) => (
+                <FadeUp key={t} delay={i * 0.08}>
+                  <li className="grid grid-cols-[3rem_1fr] border-t border-bone/12 py-6">
+                    <span className="font-mono text-sm text-frost tabular">0{i + 1}</span>
                     <div>
-                      <div className="flex items-center gap-2">
-                        <s.icon size={15} strokeWidth={2} />
-                        <h3 className="font-display text-xl tracking-wide md:text-2xl">
-                          {s.t}
-                        </h3>
-                      </div>
-                      <p className="mt-1.5 max-w-md text-sm leading-relaxed text-ink/65">
-                        {s.d}
-                      </p>
+                      <h3 className="font-display text-xl font-normal text-bone">{t}</h3>
+                      <p className="mt-2 text-sm leading-relaxed text-bone/60">{d}</p>
                     </div>
-                  </div>
+                  </li>
                 </FadeUp>
               ))}
-            </div>
-          </div>
-
-          <FadeUp delay={0.15} className="relative">
-            <div className="sticky top-24">
-              <div className="relative border-2 border-ink">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/images/tape-measure.jpg"
-                  alt="Foot measured with a tape in centimeters"
-                  className="aspect-[4/5] w-full object-cover"
-                />
-                <div className="absolute -right-3 -bottom-3 bg-signal px-4 py-3">
-                  <span className="font-display text-2xl text-bone">26.5</span>
-                  <span className="ml-1 font-mono text-[10px] tracking-[0.2em] text-bone/70">
-                    CM
-                  </span>
-                </div>
-              </div>
-              <p className="mt-4 font-mono text-[10px] leading-relaxed tracking-[0.16em] text-ink/60">
-                THE ANCHOR IS YOUR BODY — NOT A SIZE TAG. TAGS LIE; CENTIMETERS
-                DON&apos;T.
-              </p>
-            </div>
-          </FadeUp>
-        </div>
-      </section>
-
-      {/* --------------------------------------------------------- DATA GAP */}
-      <section className="border-b border-bone/10 bg-ink">
-        <div className="mx-auto grid max-w-[1600px] gap-14 px-4 py-20 md:px-8 md:py-28 lg:grid-cols-2">
-          <div>
-            <FadeUp>
-              <div className="flex items-center gap-2">
-                <TriangleAlert size={15} className="text-frost" />
-                <p className="font-mono text-[10px] tracking-[0.3em] text-fog">
-                  HONEST BY DESIGN
-                </p>
-              </div>
-              <h2 className="mt-4 font-display text-5xl leading-[0.9] tracking-tight text-bone md:text-8xl">
-                NO CHART?
-                <br />
-                NO DEAD END<span className="text-frost">.</span>
-              </h2>
-              <p className="mt-6 max-w-md text-sm leading-relaxed text-bone/65 md:text-base">
-                When a brand&apos;s chart isn&apos;t on file yet, we never fail
-                silently. You get a clearly-labelled estimate assembled from
-                sibling brands in the same category — plus a flag telling the
-                community exactly which table to add next.
-              </p>
+            </ol>
+            <FadeUp delay={0.15} className="md:col-span-4">
+              <AnchorDiagram />
             </FadeUp>
           </div>
-          <FadeUp delay={0.15} className="flex items-center">
-            <div className="w-full border border-signal bg-signal/5 p-6 md:p-8">
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-[10px] tracking-[0.22em] text-frost">
-                  ESTIMATE — LIVE EXAMPLE
-                </span>
-                <span className="font-mono text-[10px] tracking-[0.22em] text-fog">
-                  REEBOK · SLIDES
-                </span>
-              </div>
-              <p className="mt-5 font-display text-6xl leading-none text-bone md:text-8xl">
-                UK 8<span className="text-frost">.</span>
-              </p>
-              <p className="mt-4 font-mono text-[10px] leading-relaxed tracking-[0.14em] text-fog">
-                VOTES FROM: NIKE · ADIDAS · PUMA · BATA · +4 MORE
-              </p>
-              <p className="mt-4 border-t border-signal/30 pt-4 text-xs leading-relaxed text-bone/70">
-                Treat it as an estimate — once someone drops the official
-                Adilette-style chart into /admin, this becomes an exact match
-                instantly.
-              </p>
-            </div>
+        </div>
+      </section>
+
+      {/* ----------------------------------------------------- categories */}
+      <section id="categories" className="scroll-mt-14 border-b border-bone/10">
+        <div className="mx-auto max-w-[1440px] px-4 py-20 md:px-8 md:py-28">
+          <SectionHead index="03" kicker="Categories" title={<>Four scales, kept apart.</>}>
+            Slides run roomier than sneakers; tees and trousers are anchored to
+            chest and waist. Each category keeps its own anchor, so nothing is
+            converted across the line.
+          </SectionHead>
+          <ul className="mt-12 border-t border-bone/12">
+            {perCategory.map((c, i) => {
+              const def = CATEGORIES[c.id];
+              return (
+                <li key={c.id}>
+                  <FadeUp delay={i * 0.05}>
+                    <Link
+                      href={`/category/${c.id}`}
+                      className="group grid grid-cols-[2.5rem_1fr_auto] items-center gap-4 border-b border-bone/12 py-6 transition-colors hover:bg-coal md:grid-cols-12 md:py-8"
+                    >
+                      <span className="font-mono text-sm text-fog tabular md:col-span-1 md:pl-2">
+                        0{i + 1}
+                      </span>
+                      <span className="font-display text-3xl font-light tracking-[-0.02em] text-bone md:col-span-5 md:text-5xl">
+                        {def.label}
+                      </span>
+                      <span className="kicker hidden text-fog md:col-span-3 md:block">
+                        Anchor · {def.anchor}, cm
+                      </span>
+                      <span className="kicker hidden text-fog md:col-span-2 md:block">
+                        <span className="text-bone">{c.brands}</span> brands ·{" "}
+                        <span className="text-bone">{c.charted}</span> charted
+                      </span>
+                      <span className="flex justify-end pr-2 font-mono text-lg text-fog transition-all group-hover:translate-x-1 group-hover:text-frost md:col-span-1">
+                        →
+                      </span>
+                    </Link>
+                  </FadeUp>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      </section>
+
+      {/* ------------------------------------------------------- coverage */}
+      <section className="border-b border-bone/10">
+        <div className="mx-auto max-w-[1440px] px-4 py-20 md:px-8 md:py-28">
+          <SectionHead index="04" kicker="Coverage" title={<>What&apos;s on file.</>}>
+            A filled mark means we hold that brand&apos;s chart. An open mark
+            means the brand sells the category but its chart isn&apos;t in yet —
+            you&apos;ll still get an answer, built from brands that do have one,
+            and it will say so.
+          </SectionHead>
+          <FadeUp delay={0.1} className="scroll-thin mt-12 overflow-x-auto md:ml-[25%]">
+            <table className="w-full min-w-[560px] border-collapse">
+              <thead>
+                <tr className="border-b border-bone/12">
+                  <th className="kicker py-3 pr-4 text-left font-normal text-fog">Brand</th>
+                  {CATEGORY_ORDER.map((c) => (
+                    <th key={c} className="kicker px-2 py-3 text-left font-normal text-fog">
+                      {CATEGORIES[c].nav}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {coverage.map((b) => (
+                  <tr key={b.slug} className="border-b border-bone/8 transition-colors hover:bg-coal">
+                    <td className="py-2.5 pr-4 text-sm text-bone">{b.name}</td>
+                    {CATEGORY_ORDER.map((c) => {
+                      const sold = b.categories.includes(c);
+                      const genders = Object.keys(chartsBy[c][b.slug] ?? {});
+                      const state = !sold ? "none" : genders.length ? "chart" : "estimate";
+                      return (
+                        <td key={c} className="px-2 py-2.5">
+                          {state === "none" ? (
+                            <span className="kicker text-fog/30" aria-label="Not sold">·</span>
+                          ) : (
+                            <Link
+                              href={`/category/${c}/${b.slug}`}
+                              className="kicker inline-flex items-center gap-2 text-fog transition-colors hover:text-bone"
+                            >
+                              <span
+                                className={cn(
+                                  "inline-block h-2 w-2",
+                                  state === "chart" ? "bg-bone" : "border border-signal"
+                                )}
+                              />
+                              {state === "chart" ? genders.map((g) => g[0].toUpperCase()).sort().join(" ") : "Est."}
+                            </Link>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </FadeUp>
         </div>
       </section>
 
-      {/* --------------------------------------------------------- THE WALL */}
-      <section className="border-b border-bone/10 bg-ink">
-        <div className="mx-auto max-w-[1600px] px-4 py-20 md:px-8 md:py-28">
-          <FadeUp>
-            <div className="flex flex-wrap items-end justify-between gap-4">
-              <h2 className="font-display text-4xl tracking-tight text-bone md:text-6xl">
-                THE WALL<span className="text-frost">.</span>
-              </h2>
-              <span className="flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] text-fog">
-                <Database size={13} /> NEW BRAND = ONE FORM IN /ADMIN
-              </span>
-            </div>
-          </FadeUp>
-          <FadeUp delay={0.1}>
-            <div className="mt-10 flex flex-wrap gap-x-8 gap-y-4">
-              {allBrands.map((b) => (
-                <Link
-                  key={b.id}
-                  href={`/category/${b.categories[0] ?? "sneakers"}/${b.slug}`}
-                  className="group flex items-center gap-2"
-                >
-                  <span
-                    className={cn(
-                      "inline-block h-1.5 w-1.5",
-                      b.needsData ? "bg-signal" : "bg-bone/25 group-hover:bg-signal"
-                    )}
-                  />
-                  <span className="font-display text-2xl tracking-wide text-bone/60 uppercase transition-colors group-hover:text-bone md:text-3xl">
-                    {b.name}
-                  </span>
-                </Link>
-              ))}
-            </div>
-            <p className="mt-6 font-mono text-[10px] tracking-[0.16em] text-fog">
-                <span className="text-frost">■</span> STEEL MARKER — CHART
-              INCOMPLETE, CONTRIBUTIONS WELCOME.
+      {/* -------------------------------------------------------- profile */}
+      <section>
+        <div className="mx-auto grid max-w-[1440px] gap-12 px-4 py-20 md:grid-cols-12 md:px-8 md:py-28">
+          <FadeUp className="md:col-span-6">
+            <p className="kicker text-fog">
+              <span className="text-frost">05</span> — Your size profile
             </p>
-          </FadeUp>
-        </div>
-      </section>
-
-      {/* -------------------------------------------------------------- CTA */}
-      <section className="relative overflow-hidden">
-        <div
-          className="pointer-events-none absolute inset-0 opacity-15"
-          style={{
-            backgroundImage: "url(/images/knit-texture.jpg)",
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-          }}
-        />
-        <div className="relative mx-auto max-w-[1600px] px-4 py-24 md:px-8 md:py-36">
-          <FadeUp>
-            <h2 className="font-display text-[clamp(3rem,9vw,8.5rem)] leading-[0.88] tracking-tight">
-              <span className="block text-stroke">STOP GUESSING.</span>
-              <span className="block text-bone">
-                KNOW YOUR SIZE<span className="text-frost">.</span>
-              </span>
+            <h2 className="mt-6 font-display text-[clamp(2.25rem,5.4vw,4.75rem)] leading-[1] font-light tracking-[-0.03em] text-bone">
+              Tell us one size.
+              <br />
+              <span className="text-bone/45">Get all of them.</span>
             </h2>
+            <p className="mt-6 max-w-md text-base leading-relaxed text-bone/65">
+              Pick a size you already wear in any brand. We work out the
+              measurement behind it and keep it — on this device, or on your
+              Google account if you want it everywhere. Every brand page then
+              opens with your size already on it.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-2">
+              <Link
+                href="/onboarding"
+                className="kicker flex h-12 items-center bg-signal px-6 text-bone transition-colors hover:bg-bone hover:text-ink"
+              >
+                Find my size — 30 seconds
+              </Link>
+              <Link
+                href="/measure"
+                className="kicker flex h-12 items-center border border-bone/20 px-6 text-bone transition-colors hover:border-bone/60"
+              >
+                How to measure
+              </Link>
+            </div>
           </FadeUp>
-          <FadeUp delay={0.15} className="mt-10 flex flex-wrap gap-3">
-            <Link
-              href="/onboarding"
-              className="flex items-center gap-2 bg-signal px-8 py-4 font-mono text-[11px] font-semibold tracking-[0.2em] text-bone uppercase transition-colors hover:bg-bone hover:text-ink"
-            >
-              <Ruler size={14} strokeWidth={2.2} /> Find my size
-            </Link>
-            <Link
-              href="/category/sneakers"
-              className="flex items-center gap-2 border border-bone/25 px-8 py-4 font-mono text-[11px] tracking-[0.2em] text-bone uppercase transition-colors hover:border-signal hover:text-frost"
-            >
-              Straight to sneakers <ArrowUpRight size={14} />
-            </Link>
+          <FadeUp delay={0.15} className="md:col-span-5 md:col-start-8">
+            <div className="border border-bone/12">
+              <div className="flex items-center justify-between border-b border-bone/12 px-5 py-3">
+                <span className="kicker text-fog">Sneakers · men</span>
+                <span className="kicker text-bone">26.5 cm</span>
+              </div>
+              <ul>
+                {example.map((e) => (
+                  <li
+                    key={e.name}
+                    className="flex items-baseline justify-between border-b border-bone/8 px-5 py-3 last:border-0"
+                  >
+                    <span className="text-sm text-bone/80">{e.name}</span>
+                    <span className="font-display text-lg font-light tabular text-bone">{e.size}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <p className="kicker mt-3 text-fog">Example — one anchor, read in five charts</p>
           </FadeUp>
         </div>
       </section>

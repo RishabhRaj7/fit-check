@@ -3,31 +3,42 @@
 import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 
+const EASE = [0.16, 1, 0.3, 1] as const;
+
+/** Quiet entrance on scroll — a short rise, once. */
 export function FadeUp({
   children,
   className,
   delay = 0,
-  y = 28,
 }: {
   children: ReactNode;
   className?: string;
   delay?: number;
-  y?: number;
 }) {
   return (
     <motion.div
       className={className}
-      initial={{ opacity: 0, y }}
+      initial={{ opacity: 0, y: 14 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-80px" }}
-      transition={{ duration: 0.7, delay, ease: [0.22, 1, 0.36, 1] }}
+      viewport={{ once: true, margin: "-60px" }}
+      transition={{ duration: 0.7, delay, ease: EASE }}
     >
       {children}
     </motion.div>
   );
 }
 
-export function ClipReveal({
+/** A line of display type wiped in from the left — pure CSS, runs on first paint. */
+export function LineReveal({ children, delay = 0 }: { children: ReactNode; delay?: number }) {
+  return (
+    <span className="wipe-in block" style={{ animationDelay: `${delay}s` }}>
+      {children}
+    </span>
+  );
+}
+
+/** Above-the-fold entrance — pure CSS, runs on first paint. */
+export function Rise({
   children,
   className,
   delay = 0,
@@ -37,14 +48,8 @@ export function ClipReveal({
   delay?: number;
 }) {
   return (
-    <motion.div
-      className={className}
-      initial={{ clipPath: "inset(0 100% 0 0)" }}
-      whileInView={{ clipPath: "inset(0 0% 0 0)" }}
-      viewport={{ once: true, margin: "-60px" }}
-      transition={{ duration: 0.9, delay, ease: [0.22, 1, 0.36, 1] }}
-    >
+    <div className={`rise-in ${className ?? ""}`} style={{ animationDelay: `${delay}s` }}>
       {children}
-    </motion.div>
+    </div>
   );
 }

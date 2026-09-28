@@ -88,6 +88,7 @@ export default function TapeMeasure({ maxCm }: { maxCm: number }) {
             />
             {t.major && (
               <text
+                fontFamily="var(--font-plex-mono)"
                 x={t.x}
                 y={TAPE_Y + 9.5}
                 fontSize={7.5}
